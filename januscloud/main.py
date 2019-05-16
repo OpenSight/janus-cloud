@@ -12,7 +12,8 @@ from januscloud.common.schema import Schema, StrVal
 
 
 config_schema = Schema({
-    'listen': StrVal(min_len=1, max_len=128),
+    'ws_listen': StrVal(min_len=1, max_len=128),
+    'rest_listen': StrVal(min_len=1, max_len=128),
 })
 
 
@@ -41,7 +42,7 @@ def main():
         #ws_server = WSServer(config['ws_listen'], das_mngr.ivt_online)
         log.info('Started Janus Cloud')
 
-        gevent.joinall(map(gevent.spawn, (ws_server.server_forever, rest_server.serve_forever)))
+        #gevent.joinall(map(gevent.spawn, (ws_server.server_forever, rest_server.serve_forever)))
         log.info("Quit")
 
     except Exception:

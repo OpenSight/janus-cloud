@@ -1,21 +1,26 @@
 # -*- coding: utf-8 -*-
 import urllib.parse
+import json
 import logging
-from gevent.event import Event
 from ws4py.websocket import WebSocket
+from ws4py.server.geventserver import WSGIServer
+from ws4py.server.wsgiutils import WebSocketWSGIApplication
 from ws4py.client.geventclient import WebSocketClient
 from gevent.lock import RLock
+from gevent.queue import Queue
 
 log = logging.getLogger(__name__)
 
 
 class WSServerTransport(WebSocket):
 
-    APP_FACTORY = None
+    CONNECTED_CBK = None
+    DEFAULT_ENCODER = json.JSONEncoder()
+    DEFAULT_DECODER = json.JSONDecoder()
 
     def __init__(self, *args, **kwargs):
         super(WSServerTransport, self).__init__(*args, **kwargs)
-        self._app = None
+        self.messages = Queue(maxsize=32)
 
     def __str__(self):
         return 'websocket server connection with {0}'.format(self.peer_address)
@@ -41,48 +46,70 @@ class WSServerTransport(WebSocket):
             if not self.environ.get('QUERY_STRING'):
                 query = {}
             else:
-                query = urllib.parse.parse_qs(self.environ['QUERY_STRING'])
-            for key, value in query.iteritems():
+                query = urllib.parse.parse_qs(self.environ['QUERY_STRING'], keep_blank_values=True)
+            for key, value in query.items():
                 query[key] = value[0]
-            self._app = self.APP_FACTORY(self, query)
+            self.CONNECTED_CBK(**query)
         except Exception:
             log.exception('Failed to create app for {0}'.format(self))
             raise
 
     def closed(self, code, reason=None):
-        app, self._app = self._app, None
-        if app:
-            app.on_close()
+        self.messages.put(StopIteration)
 
     def received_message(self, message):
         log.debug("Received message from {0}: {1}".format(self, message))
-        if self._app:
-            self._app.on_received_packet(message)
-        else:
-            log.warning('Websocket server app already closed')
+        if message.is_text:
+            try:
+                self.messages.put_nowait(self.DEFAULT_DECODER.decode(str(message)))
+            except Exception:
+                log.exception('Failed to put message on {0}, closing'.format(self))
+                self.messages.queue.clear()
+                self.messages.put(StopIteration)
 
-    def send_packet(self, data):
-        log.debug("Sending message on {0}: {1}".format(self, data))
-        self.send(data)
+    def receive(self, block=True):
+        # If the websocket was terminated and there are no messages
+        # left in the queue, return None immediately otherwise the client
+        # will block forever
+        if self.terminated and self.messages.empty():
+            return None
+        message = self.messages.get(block=block)
+        if message is StopIteration:
+            return None
+        return message
 
-    def force_shutdown(self):
-        # called by the upper layer, and no callback will be possible when closed
+    def send(self, obj, binary=False):
+        log.debug("Sending message on {0}: {1}".format(self, obj))
+        super(WSServerTransport, self).send(self.DEFAULT_ENCODER.encode(obj), binary=binary)
+
+    def close(self, code=1000, reason=''):
         log.info("Shutting down {0}".format(self))
-        self._app = None
-        self.close()
-        log.info('Closed {0}'.format(self))
+        self.messages.put(StopIteration)
+        super(WSServerTransport, self).close()
 
 
-class WSClientTransport(WebSocketClient):
+class WSServer(object):
+
+    def __init__(self, listen, connected_cbk):
+        WSServerTransport.CONNECTED_CBK = connected_cbk
+        self._listen = listen
+
+    def server_forever(self):
+        server = WSGIServer(self._listen, WebSocketWSGIApplication(handler_cls=WSServerTransport), log=logging.getLogger('websocket server'))
+        log.info("Starting websocket server on {0}".format(self._listen))
+        server.serve_forever()
+
+
+class WSClient(WebSocketClient):
 
     APP_FACTORY = None
+    DEFAULT_ENCODER = json.JSONEncoder()
+    DEFAULT_DECODER = json.JSONDecoder()
 
     def __init__(self, url):
-        self._close_event = Event()
         # patch socket.sendall to protect it with lock,
         # in order to prevent sending data from multiple greenlets concurrently
         WebSocketClient.__init__(self, url)
-        self._app = None
         lock = RLock()
         _sendall = self.sock.sendall
 
@@ -90,43 +117,27 @@ class WSClientTransport(WebSocketClient):
             lock.acquire()
             try:
                 _sendall(data)
-            except:
+            except Exception:
                 raise
             finally:
                 lock.release()
         self.sock.sendall = sendall
-
-    def connect(self):
-        super(WSClientTransport, self).connect()
-        self._app = self.APP_FACTORY(self)
-        log.info("Connected to websocket server {0}".format(self.url))
-
-    def closed(self, code, reason=None):
-        app, self._app = self._app, None
-        if app:
-            app.on_close()
-        self._close_event.set()
+        self.messages = Queue(maxsize=32)
 
     def received_message(self, message):
-        log.debug("Received message {0}".format(message))
-        if self._app:
-            self._app.on_received_packet(message)
-        else:
-            log.warning('Websocket client app already closed')
+        if message.is_text:
+            try:
+                self.messages.put_nowait(self.DEFAULT_DECODER.decode(str(message)))
+            except Exception:
+                log.exception('Failed to put message on {0}, closing'.format(self))
+                self.messages.queue.clear()
+                self.messages.put(StopIteration)
 
-    def send_packet(self, data):
-        log.debug("Sending message {0}".format(data))
-        self.send(data)
+    def send(self, obj, binary=False):
+        log.debug("Sending message on {0}: {1}".format(self, obj))
+        super(WSClient, self).send(self.DEFAULT_ENCODER.encode(obj), binary=binary)
 
-    def force_shutdown(self):
-        # called by the upper layer, and no callback will be possible when closed
-        self._app = None
-        self.close()
-        self._close_event.set()
-        log.info('Websocket client closed')
-
-    def wait_close(self):
-        self._close_event.wait()
-
-    def app(self):
-        return self._app
+    def close(self, code=1000, reason=''):
+        log.info("Shutting down {0}".format(self))
+        self.messages.put(StopIteration)
+        super(WSClient, self).close()
