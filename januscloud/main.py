@@ -2,6 +2,7 @@
 import gevent.monkey
 gevent.monkey.patch_all()
 import sys
+import signal
 from gevent.pywsgi import WSGIServer
 from pyramid.config import Configurator
 from pyramid.renderers import JSON
@@ -9,6 +10,7 @@ from januscloud.common.utils import CustomJSONEncoder
 from januscloud.common.logger import default_config as default_log_config
 from januscloud.common.confparser import parse as parse_config
 from januscloud.common.schema import Schema, StrVal
+from januscloud.transport.ws import WSServer
 
 
 config_schema = Schema({
@@ -39,10 +41,18 @@ def main():
             pyramid_config.make_wsgi_app(),
             log=logging.getLogger('rest server')
         )
-        #ws_server = WSServer(config['ws_listen'], das_mngr.ivt_online)
+        ws_server = WSServer(config['ws_listen'], lambda conn, **args: None)
         log.info('Started Janus Cloud')
 
-        #gevent.joinall(map(gevent.spawn, (ws_server.server_forever, rest_server.serve_forever)))
+        def stop_server():
+            rest_server.stop(timeout=5)
+            ws_server.stop()
+
+        gevent.signal(signal.SIGTERM, stop_server)
+        gevent.signal(signal.SIGQUIT, stop_server)
+        gevent.signal(signal.SIGINT, stop_server)
+
+        gevent.joinall(map(gevent.spawn, (ws_server.server_forever, rest_server.serve_forever)))
         log.info("Quit")
 
     except Exception:
