@@ -130,10 +130,10 @@ class WSClient(WebSocketClient):
     DEFAULT_ENCODER = json.JSONEncoder()
     DEFAULT_DECODER = json.JSONDecoder()
 
-    def __init__(self, url, msg_encoder=None, msg_decoder=None):
+    def __init__(self, url, protocols=None, msg_encoder=None, msg_decoder=None):
         # patch socket.sendall to protect it with lock,
         # in order to prevent sending data from multiple greenlets concurrently
-        WebSocketClient.__init__(self, url)
+        WebSocketClient.__init__(self, url, protocols=protocols)
         self._msg_encoder = msg_encoder or self.DEFAULT_ENCODER
         self._msg_decoder = msg_decoder or self.DEFAULT_DECODER
         lock = RLock()

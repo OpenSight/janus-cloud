@@ -38,7 +38,7 @@ class EchoServer(object):
 class Client(object):
 
     def __init__(self, url):
-        self._conn = WSClient(url)
+        self._conn = WSClient(url, protocols=('janus-protocol',))
         self._conn.connect()
         gevent.spawn(self.receive_loop)
         gevent.spawn(self.send_loop)
@@ -64,8 +64,11 @@ if __name__ == '__main__':
     time.sleep(1)
     c = Client('ws://127.0.0.1:9999')
     time.sleep(60)
-
-
-
-
-
+    """
+    # example to connect to Janus
+    client = WSClient("ws://192.168.0.221/ws/media", protocols=('janus-protocol',))
+    client.connect()
+    client.send_msg({'janus': 'info', 'transaction': 'abcdef'})
+    print(client.receive_msg())
+    client.close()
+    """
