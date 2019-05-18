@@ -29,11 +29,11 @@ def main():
         if len(sys.argv) == 2:
             config = parse_config(sys.argv[1])
         else:
-            config = parse_config('/etc/januscloud.yml')
+            config = parse_config('/etc/janus-proxy.yml')
 
         pyramid_config = Configurator()
         pyramid_config.add_renderer(None, JSON(indent=4, check_circular=True, cls=CustomJSONEncoder))
-        pyramid_config.include('januscloud.rest', route_prefix='api/januscloud/v1')
+        pyramid_config.include('januscloud.rest', route_prefix='janus-proxy')
         # TODO register service to pyramid registry
         # pyramid_config.registry.das_mngr = das_mngr
 
@@ -44,7 +44,7 @@ def main():
         )
         # TODO replace lambda with incoming connection handling function
         ws_server = WSServer(config['ws_listen'], lambda conn, **args: None)
-        log.info('Started Janus Cloud')
+        log.info('Started Janus Proxy')
 
         def stop_server():
             rest_server.stop(timeout=5)
@@ -58,7 +58,7 @@ def main():
         log.info("Quit")
 
     except Exception:
-        log.exception('Failed to start Janus Cloud')
+        log.exception('Failed to start Janus Proxy')
 
 
 if __name__ == '__main__':

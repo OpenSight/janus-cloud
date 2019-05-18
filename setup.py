@@ -46,6 +46,6 @@ setup(name='janus-cloud',
       tests_require=requires,
       entry_points="""
       [console_scripts]
-      januscloud = januscloud.main:main
+      janus-proxy = januscloud.main:main
       """,
       )
