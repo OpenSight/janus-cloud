@@ -34,6 +34,7 @@ def main():
         pyramid_config = Configurator()
         pyramid_config.add_renderer(None, JSON(indent=4, check_circular=True, cls=CustomJSONEncoder))
         pyramid_config.include('januscloud.rest', route_prefix='api/januscloud/v1')
+        # TODO register service to pyramid registry
         # pyramid_config.registry.das_mngr = das_mngr
 
         rest_server = WSGIServer(
@@ -41,6 +42,7 @@ def main():
             pyramid_config.make_wsgi_app(),
             log=logging.getLogger('rest server')
         )
+        # TODO replace lambda with incoming connection handling function
         ws_server = WSServer(config['ws_listen'], lambda conn, **args: None)
         log.info('Started Janus Cloud')
 
@@ -52,7 +54,7 @@ def main():
         gevent.signal(signal.SIGQUIT, stop_server)
         gevent.signal(signal.SIGINT, stop_server)
 
-        gevent.joinall(map(gevent.spawn, (ws_server.server_forever, rest_server.serve_forever)))
+        gevent.joinall(list(map(gevent.spawn, (ws_server.server_forever, rest_server.serve_forever))))
         log.info("Quit")
 
     except Exception:

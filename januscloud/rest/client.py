@@ -7,6 +7,6 @@ def includeme(config):
 
 
 @get_view(route_name='client_list')
-def get_das_list(request):
+def get_client_list(request):
     # TODO
-    return
+    return {'list': [1, 2, 3]}
