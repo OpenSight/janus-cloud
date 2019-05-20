@@ -1,7 +1,9 @@
 Janus Cloud
 =============
 
-A proxy for Janus WebRTC Server to enable WebRTC server cluster deployment.
+A proxy solution to deploy Janus WebRTC server cluster.
+
+**NOTE：！！！！in-developing, don't fork me！！！！**
 
 installation
 ----------------
