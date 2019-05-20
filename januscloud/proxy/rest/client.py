@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from januscloud.rest.common import get_view
+from januscloud.proxy.rest.common import get_view
 
 
 def includeme(config):

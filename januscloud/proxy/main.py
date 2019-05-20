@@ -33,7 +33,7 @@ def main():
 
         pyramid_config = Configurator()
         pyramid_config.add_renderer(None, JSON(indent=4, check_circular=True, cls=CustomJSONEncoder))
-        pyramid_config.include('januscloud.rest', route_prefix='janus-proxy')
+        pyramid_config.include('januscloud.proxy.rest', route_prefix='janus-proxy')
         # TODO register service to pyramid registry
         # pyramid_config.registry.das_mngr = das_mngr
 
