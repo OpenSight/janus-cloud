@@ -17,7 +17,7 @@ setup(name='janus-cloud',
       version='0.1.0',
       license='AGPLv3',
       url='https://github.com/OpenSight/janus-cloud',
-      description='',
+      description='Janus-cloud is an JANUS API proxy to deploy the Janus WebRTC server cluster',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
           "Development Status :: 4 - Beta",
@@ -37,8 +37,8 @@ setup(name='janus-cloud',
           "Topic :: System :: Systems Administration",
       ],
       author='OpenSight',
-      author_email='',
-      keywords='',
+      author_email='public@opensight.cn',
+      keywords='Janus cloud WebRTC',
       packages=find_packages(),
       include_package_data=True,
       zip_safe=False,
@@ -46,6 +46,6 @@ setup(name='janus-cloud',
       tests_require=requires,
       entry_points="""
       [console_scripts]
-      janus-proxy = januscloud.main:main
+      janus-proxy = januscloud.proxy.main:main
       """,
       )
