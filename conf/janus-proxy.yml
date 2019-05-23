@@ -1,2 +1,68 @@
-rest_listen: '127.0.0.1:7000'
-ws_listen: '127.0.0.1:7001'
+
+
+# General configuration. for some basic configuration 
+general:
+  #daemonize: true						# Whether Janus-proxy should run as a daemon
+                                        # or not (default=run in foreground)
+  configs_folder: "/etc/janus-cloud"    # Configuration files folder, default is the same 
+                                        # with the folder containing this config file
+  server_name: "MyJanusProxy"           # Public name of this Janus proxy
+                                        # as it will appear in an info request
+  session_timeout: 60                   # How long (in seconds) we should wait before
+                                        # deciding a Janus session has timed out. A
+                                        # session times out when no request is received
+                                        # for session_timeout seconds (default=60s).
+                                        # Setting this to 0 will disable the timeout
+                                        # mechanism, which is NOT suggested as it may
+                                        # risk having orphaned sessions (sessions not
+                                        # controlled by any transport and never freed).
+                                        # To avoid timeouts, keep-alives can be used.  
+  
+log:
+  log_to_stdout: false                  # Whether the Janus output should be written
+                                        # to stdout or not (default=true)
+  log_to_file: "/path/to/janus.log"		# Whether to use a log file or not
+  debug_level: 4                        # Debug/logging level, valid values are 0-7
+
+# Certificate and key to use for WSS and HTTPS (and passphrase if needed).
+certificates:
+  #cert_pem: "/etc/janux-cloud/cert/mycert.pem"
+  #cert_key: "/etc/janux-cloud/cert/mycert.key"
+  #cert_pwd: "secretpassphrase"
+
+# You can choose which of the available plugins should be
+# enabled or not. list all the plugin's module path(e.g. januscloud.plugins.echotest)
+# below. 
+plugins:   
+  - januscloud.proxy.plugin.echotest
+  - januscloud.proxy.plugin.videoroom
+
+# Configuration for the websocket transport. 
+# Websocket transport module outputs the Janus api on websocket protocol just as Janus server
+ws_transport:
+
+  json: "indented"                  # Whether the JSON messages should be indented (default),
+                                    # plain (no indentation) or compact (no indentation and no spaces)
+  #pingpong_trigger: 30             # After how many seconds of idle, a PING should be sent
+  #pingpong_timeout: 10             # After how many seconds of not getting a PONG, a timeout should be detected
+
+  ws: true                          # Whether to enable the WebSockets API
+  ws_listen: '0.0.0.0:8288'         # WebSockets server listen addr
+
+  wss: false                        # Whether to enable secure WebSockets
+  #wss_listen: '0.0.0.0:8289'       # WebSockets server secure listen addr, if enabled
+
+  #ws_logging: "err,warn"           # libwebsockets debugging level as a comma separated list of things
+                                    # to debug, supported values: err, warn, notice, info, debug, parser,
+                                    # header, ext, client, latency, user, count (plus 'none' and 'all')  
+  max_greenlet_num: 1024            # size of the greenlet pool for this transport
+
+# Configuration about the RESTful api of janus-proxy. janus-proxy provide an other set of RESTful API for admin  
+admin_api:
+  json: "indented"                  # Whether the JSON messages should be indented (default),
+                                    # plain (no indentation) or compact (no indentation and no spaces)
+  http_listen: '127.0.0.1:8000'     # REST API server listen addr
+  api_base_path: "/janus-proxy"	    # Base path to bind to in the web server (plain HTTP only)
+  
+  
+
