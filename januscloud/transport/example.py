@@ -23,39 +23,36 @@ class EchoServer(object):
 
     def __init__(self, conn):
         self._conn = conn
-        gevent.spawn(self.receive_loop)
+        self._conn.register_recv_msg_cbk(self._on_recv_msg)
+        self._conn.register_close_cbk(self._on_closed)
 
-    def receive_loop(self):
-        while True:
-            msg = self._conn.receive_msg()
-            if not msg:
-                log.info('Server connection closed')
-                break
-            else:
-                self._conn.send_msg(msg)
+    def _on_recv_msg(self, msg):
+        log.info('Msg received: {0}'.format(msg))
+        self._conn.send_msg(msg, timeout=10)
+
+    def _on_closed(self):
+        pass
 
 
 class Client(object):
 
     def __init__(self, url):
-        self._conn = WSClient(url, protocols=('janus-protocol',))
-        self._conn.connect()
-        gevent.spawn(self.receive_loop)
+        self._conn = WSClient(url, self._on_recv_msg, self._on_closed, protocols=('janus-protocol',))
         gevent.spawn(self.send_loop)
+
+    def _on_recv_msg(self, msg):
+        pass
+
+    def _on_closed(self):
+        log.info('Client closed')
 
     def send_loop(self):
         for x in range(5):
             time.sleep(1 + 1/random.randint(1, 10))
-            self._conn.send_msg({'msg_id': x})
+            self._conn.send_msg({'msg_id': x}, 10)
+            log.info('Msg sent')
         time.sleep(2)
         self._conn.close()
-
-    def receive_loop(self):
-        while True:
-            msg = self._conn.receive_msg()
-            if not msg:
-                log.info('Client closed')
-                break
 
 
 if __name__ == '__main__':
