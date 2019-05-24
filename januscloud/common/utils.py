@@ -2,6 +2,9 @@
 import json
 import base64
 import datetime
+from .error import JanusCloudError
+import sys
+import traceback
 
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -33,3 +36,30 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj_dict
         else:
             return json.JSONEncoder.default(self, o)
+
+
+def create_janus_msg(status, session_id=0, transaction=None, **kwargs):
+    """ create a basic janus message"""
+    msg = {"janus": str(status)}
+    if session_id > 0:
+        msg["session_id"] = session_id
+    if transaction:
+        msg["transaction"] = str(transaction)
+    msg.update(kwargs)
+    return msg
+
+
+def janus_cloud_error_to_janus_msg(session_id=0, transaction=None, exception=None):
+    """ convert a Error exception to a message in dict form """
+    error = {}
+    if isinstance(exception, JanusCloudError):
+        error["code"] = exception.code
+        error["reason"] = str(exception)
+    else:
+        error["code"] = 500
+        error["reason"] = str(exception)
+
+    type, dummy, tb = sys.exc_info()
+    tb_list = traceback.format_list(traceback.extract_tb(tb)[-10:])
+    error["traceback"] = tb_list
+    return create_janus_msg("error", session_id, transaction, error=error)
