@@ -51,10 +51,6 @@ ws_transport:
 
   wss: false                        # Whether to enable secure WebSockets
   #wss_listen: '0.0.0.0:8289'       # WebSockets server secure listen addr, if enabled
-
-  #ws_logging: "err,warn"           # libwebsockets debugging level as a comma separated list of things
-                                    # to debug, supported values: err, warn, notice, info, debug, parser,
-                                    # header, ext, client, latency, user, count (plus 'none' and 'all')  
   max_greenlet_num: 1024            # size of the greenlet pool for this transport
 
 # Configuration about the RESTful api of janus-proxy. janus-proxy provide an other set of RESTful API for admin  
