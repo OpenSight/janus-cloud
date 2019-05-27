@@ -14,6 +14,8 @@ def parse(file_path, schema=None):
             conf = yaml.safe_load(f)
     else:
         raise Exception("Configure file {0} does not exit".format(file_path))
+    # import pprint
+    # pprint.pprint(conf)
     if schema is not None:
         conf = schema.validate(conf)
     return conf

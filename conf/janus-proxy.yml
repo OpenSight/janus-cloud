@@ -21,12 +21,12 @@ general:
 log:
   log_to_stdout: false                  # Whether the Janus output should be written
                                         # to stdout or not (default=true)
-  log_to_file: "/path/to/janus.log"		# Whether to use a log file or not
+  log_to_file: "/path/to/janus.log"     # Whether to use a log file or not
   debug_level: 4                        # Debug/logging level, valid values are 0-7
 
 # Certificate and key to use for WSS and HTTPS (and passphrase if needed).
 certificates:
-  #cert_pem: "/etc/janux-cloud/cert/mycert.pem"
+  cert_pem: ""
   #cert_key: "/etc/janux-cloud/cert/mycert.key"
   #cert_pwd: "secretpassphrase"
 
@@ -34,8 +34,8 @@ certificates:
 # enabled or not. list all the plugin's module path(e.g. januscloud.plugins.echotest)
 # below. 
 plugins:   
-  - januscloud.proxy.plugin.echotest
-  - januscloud.proxy.plugin.videoroom
+  - januscloud.proxy.plugin.echotest:create
+  - januscloud.proxy.plugin.videoroom:create
 
 # Configuration for the websocket transport. 
 # Websocket transport module outputs the Janus api on websocket protocol just as Janus server
@@ -59,7 +59,7 @@ admin_api:
   json: "indented"                  # Whether the JSON messages should be indented (default),
                                     # plain (no indentation) or compact (no indentation and no spaces)
   http_listen: '127.0.0.1:8000'     # REST API server listen addr
-  api_base_path: "/janus-proxy"	    # Base path to bind to in the web server (plain HTTP only)
+  api_base_path: '/janus-proxy'     # Base path to bind to in the web server (plain HTTP only)
   
   
 

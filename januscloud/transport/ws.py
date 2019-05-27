@@ -135,7 +135,7 @@ class WSServer(object):
             }
         )
 
-    def server_forever(self):
+    def serve_forever(self):
         log.info("Starting websocket server on {0}".format(self._listen))
         self._server.serve_forever()
 

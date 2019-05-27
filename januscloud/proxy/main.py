@@ -63,32 +63,33 @@ def main():
             log=logging.getLogger('rest server')
         )
         server_list.append(rest_server)
-        log.info('Admin RESTAPI server startup at http://{0}'.format(config['admin_api']['http_listen']))
+        log.info('Admin RESTAPI server listens on http://{0}'.format(config['admin_api']['http_listen']))
 
         # start ws transport server
         if config['ws_transport']['wss']:
             # TODO replace lambda with incoming connection handling function
             wss_server = WSServer(
                 config['ws_transport']['wss_listen'],
-                lambda conn, **args: None,
+                request_handler,
                 keyfile=config['certificates']['cert_key'],
                 certfile=config['ssl_certfile']
             )
             server_list.append(wss_server)
-            log.info('Transport wss server startup at wss://{0}'.format(config['ws_transport']['wss_listen']))
+            log.info('Transport wss server listens at wss://{0}'.format(config['ws_transport']['wss_listen']))
 
         if config['ws_transport']['ws']:
             # TODO replace lambda with incoming connection handling function
             ws_server = WSServer(
                 config['ws_transport']['ws_listen'],
-                lambda conn, **args: None)
+                request_handler)
 
             server_list.append(ws_server)
-            log.info('Transport ws server startup successful at ws://{0}'.format(config['ws_transport']['wss_listen']))
+            log.info('Transport ws server listens at ws://{0}'.format(config['ws_transport']['wss_listen']))
 
         log.info('Janus Proxy is launched successfully')
 
         def stop_server():
+            log.info('Janus Proxy receives signals to quit...')
             for server in server_list:
                 server.stop()
 
@@ -96,7 +97,7 @@ def main():
         gevent.signal(signal.SIGQUIT, stop_server)
         gevent.signal(signal.SIGINT, stop_server)
 
-        serve_forever(server_list) # serve all server
+        serve_forever(server_list)  # serve all server
 
         log.info("Quit")
 
@@ -107,7 +108,7 @@ def main():
 def serve_forever(server_list):
     server_greenlets = []
     for server in server_list:
-        server_list.append(gevent.spawn(server.serve_forever))
+        server_greenlets.append(gevent.spawn(server.serve_forever))
     gevent.joinall(server_greenlets)
 
 
