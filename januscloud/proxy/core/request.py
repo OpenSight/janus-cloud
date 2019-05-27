@@ -1,12 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import urllib.parse
-import json
-import random
-import time
 import logging
-from januscloud.transport.ws import WSServer, WSClient
-from januscloud.common.logger import test_config
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
@@ -16,11 +10,10 @@ from januscloud.common.schema import Schema, Optional, DoNotCare, \
 log = logging.getLogger(__name__)
 
 
-
 class TransportSession(object):
     """ This class should be sub-class by the transport """
 
-    def send_message(self, message={}):
+    def send_message(self, message):
         """ Method to send a message to a client over a transport session,
 
         Args:
@@ -33,7 +26,7 @@ class TransportSession(object):
         """
         pass
 
-    def session_created(self, session_id=""):
+    def session_created(self, session_id):
         """ Method to notify the transport that a new janus session has been created from this transport
 
         Args:
@@ -45,7 +38,7 @@ class TransportSession(object):
         """
         pass
 
-    def session_over(self, session_id="", timeout=False, claimed=False):
+    def session_over(self, session_id, timeout=False, claimed=False):
         """ Method to notify the transport plugin that a session it originated timed out
 
 
@@ -60,7 +53,7 @@ class TransportSession(object):
         """
         pass
 
-    def session_claimed(self, session_id=""):
+    def session_claimed(self, session_id):
         """ Method to notify the transport plugin that a session it owned was claimed by another transport
 
         Args:
@@ -82,7 +75,7 @@ class Request(object):
         DoNotCare(str): object  # for all other key we don't care
     })
 
-    def __init__(self, transport_session=None, message={}):
+    def __init__(self, transport_session, message):
         message = self.request_schema.validate(message)
         self.transport_session = transport_session
         self.message = message
@@ -173,7 +166,7 @@ class RequestHandler(object):
         except Exception as e:
             return error_to_janus_msg(request.session_id, request.transport_session, e)
 
-    def transport_gone(self, transport_session=None):
+    def transport_gone(self, transport_session):
         """ notify transport session is closed by the transport module """
 
         pass

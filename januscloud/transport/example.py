@@ -6,31 +6,28 @@ import time
 import logging
 from januscloud.transport.ws import WSServer, WSClient
 from januscloud.common.logger import test_config
+from januscloud.proxy.core.request import RequestHandler
 
 log = logging.getLogger(__name__)
 
 
-def server_factory(conn, **params):
-    """
-    :param conn:
-    :param params: URL queries
-    :return:
-    """
-    return EchoServer(conn)
+class EchoServer(RequestHandler):
 
+    def incoming_request(self, request):
+        """ handle the request from the transport module
 
-class EchoServer(object):
+        Args:
+            request: the request to handle
 
-    def __init__(self, conn):
-        self._conn = conn
-        self._conn.register_recv_msg_cbk(self._on_recv_msg)
-        self._conn.register_close_cbk(self._on_closed)
+        Returns:
+            a dict to response to the initial client
 
-    def _on_recv_msg(self, msg):
-        log.info('Msg received: {0}'.format(msg))
-        self._conn.send_msg(msg, timeout=10)
+        """
+        log.info('Msg received: {0}'.format(request.message))
+        return request.message
 
-    def _on_closed(self):
+    def transport_gone(self, transport_session):
+        """ notify transport session is closed by the transport module """
         pass
 
 
@@ -41,7 +38,7 @@ class Client(object):
         gevent.spawn(self.send_loop)
 
     def _on_recv_msg(self, msg):
-        pass
+        log.info('response received: {0}'.format(msg))
 
     def _on_closed(self):
         log.info('Client closed')
@@ -49,7 +46,7 @@ class Client(object):
     def send_loop(self):
         for x in range(5):
             time.sleep(1 + 1/random.randint(1, 10))
-            self._conn.send_msg({'msg_id': x}, 10)
+            self._conn.send_message({'janus': 'abc', 'transaction': str(x)})
             log.info('Msg sent')
         time.sleep(2)
         self._conn.close()
@@ -57,15 +54,17 @@ class Client(object):
 
 if __name__ == '__main__':
     test_config(debug=True)
-    gevent.spawn(WSServer('127.0.0.1:9999', server_factory).server_forever)
+    gevent.spawn(WSServer('127.0.0.1:9999', EchoServer(), keyfile='../../certs/mycert.key', certfile='../../certs/mycert.pem').server_forever)
     time.sleep(1)
-    c = Client('ws://127.0.0.1:9999')
+    c = Client('wss://127.0.0.1:9999')
     time.sleep(60)
     """
     # example to connect to Janus
-    client = WSClient("ws://192.168.0.221/ws/media", protocols=('janus-protocol',))
-    client.connect()
+    def incoming_msg(msg):
+        print(msg)
+    client = WSClient("wss://192.168.0.221/ws/media", incoming_msg, protocols=('janus-protocol',))
     client.send_msg({'janus': 'info', 'transaction': 'abcdef'})
-    print(client.receive_msg())
+    time.sleep(5)
     client.close()
     """
+
