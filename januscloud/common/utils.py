@@ -49,7 +49,7 @@ def create_janus_msg(status, session_id=0, transaction=None, **kwargs):
     return msg
 
 
-def janus_cloud_error_to_janus_msg(session_id=0, transaction=None, exception=None):
+def error_to_janus_msg(session_id=0, transaction=None, exception=None):
     """ convert a Error exception to a message in dict form """
     error = {}
     if isinstance(exception, JanusCloudError):

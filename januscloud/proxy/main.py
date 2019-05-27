@@ -31,6 +31,11 @@ def main():
         else:
             config = parse_config('/etc/janus-proxy.yml')
 
+        # load the core
+        from januscloud.proxy.core.request import RequestHandler
+        request_handler = RequestHandler()
+
+
         pyramid_config = Configurator()
         pyramid_config.add_renderer(None, JSON(indent=4, check_circular=True, cls=CustomJSONEncoder))
         pyramid_config.include('januscloud.proxy.rest', route_prefix='janus-proxy')
