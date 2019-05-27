@@ -1,0 +1,6 @@
+include certs/*
+include conf/*
+include doc/*
+include CHANGES.md
+include LICENSE
+include README.md
