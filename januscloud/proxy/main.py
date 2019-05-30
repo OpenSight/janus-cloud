@@ -7,6 +7,7 @@ import signal
 from gevent.pywsgi import WSGIServer
 from pyramid.config import Configurator
 from pyramid.renderers import JSON
+
 from januscloud.common.utils import CustomJSONEncoder
 from januscloud.common.logger import default_config as default_log_config
 from januscloud.transport.ws import WSServer
@@ -26,15 +27,12 @@ def main():
         else:
             config = load_conf('/etc/janus-proxy.yml')
 
-        cert_pem_file = None
-        cert_key_file = None
-        if config['ws_transport'].get('wss'):
-            if 'certificates' not in config:
-                raise Exception('No SSL keyfile or certfile given')
-            cert_pem_file = config['certificates'].get('cert_pem')
-            cert_key_file = config['certificates'].get('cert_key')
-            if not os.path.isfile(cert_pem_file) or not os.path.isfile(cert_key_file):
-                raise Exception('SSL keyfile or cerfile not found')
+        cert_pem_file = config['certificates'].get('cert_pem')
+        cert_key_file = config['certificates'].get('cert_key')
+
+        # print(cert_pem_file)
+
+
 
         # load the core
         request_handler = RequestHandler()
@@ -56,16 +54,17 @@ def main():
         server_list.append(rest_server)
         if config['ws_transport']['wss']:
             wss_server = WSServer(
-                config['ws_transport']['ws_listen'],
+                config['ws_transport']['wss_listen'],
                 request_handler,
                 keyfile=cert_key_file,
                 certfile=cert_pem_file
             )
             server_list.append(wss_server)
-            log.info('Transport wss server listens at wss://{0}'.format(config['ws_transport']['wss_listen']))
+
         if config['ws_transport']['ws']:
             ws_server = WSServer(config['ws_transport']['ws_listen'], request_handler)
             server_list.append(ws_server)
+
         log.info('Started Janus Proxy')
 
         def stop_server():

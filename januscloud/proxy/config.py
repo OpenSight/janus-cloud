@@ -3,7 +3,7 @@
 from januscloud.common.schema import Schema, StrVal, Default, AutoDel, Optional, BoolVal, IntVal, \
     StrRe, EnumVal
 from januscloud.common.confparser import parse as parse_config
-
+from pkg_resources import Requirement, resource_filename
 
 config_schema = Schema({
     Optional("general"): Default({
@@ -50,7 +50,10 @@ def load_conf(path):
     config = parse_config(path, config_schema)
 
     # set up the default cert pathname
-    # TODO
+    if config['certificates'].get('cert_key') is None:
+        config['certificates']['cert_key'] = resource_filename(Requirement.parse("janus-cloud"), "/certs/mycert.key")
+    if config['certificates'].get('cert_pem') is None:
+        config['certificates']['cert_pem'] = resource_filename(Requirement.parse("janus-cloud"), "/certs/mycert.pem")
 
     # check other configure option is valid or not
     # TODO
