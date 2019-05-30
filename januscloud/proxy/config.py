@@ -58,8 +58,6 @@ def load_conf(path):
     return config
 
 
-
-
 if __name__ == '__main__':
     conf = config_schema.validate({})
     import pprint

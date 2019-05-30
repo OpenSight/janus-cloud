@@ -111,6 +111,13 @@ class WSServerConn(WebSocket):
 class WSServer(object):
 
     def __init__(self, listen, request_handler, msg_handler_pool_size=1024, keyfile=None, certfile=None):
+        """
+        :param listen: string ip:port
+        :param request_handler: instance of januscloud.proxy.core.request:RequestHandler
+        :param msg_handler_pool_size:
+        :param keyfile:
+        :param certfile:
+        """
         self._msg_handler_pool = Pool(size=msg_handler_pool_size)
         self._request_handler = request_handler
         self._listen = listen

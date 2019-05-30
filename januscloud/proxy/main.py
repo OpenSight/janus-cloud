@@ -9,12 +9,9 @@ from pyramid.config import Configurator
 from pyramid.renderers import JSON
 from januscloud.common.utils import CustomJSONEncoder
 from januscloud.common.logger import default_config as default_log_config
-from januscloud.common.confparser import parse as parse_config
-from januscloud.common.schema import Schema, StrVal, BoolVal, Optional, Default, IntVal, ListVal, EnumVal
 from januscloud.transport.ws import WSServer
+from januscloud.proxy.core.request import RequestHandler
 from januscloud.proxy.config import load_conf
-
-
 
 
 def main():
@@ -28,28 +25,19 @@ def main():
             config = load_conf(sys.argv[1])
         else:
             config = load_conf('/etc/janus-proxy.yml')
-        '''
-        jiankai: use a default keyfile and certfile in the distribution
-        if config['enable_https'] or config['enable_wss']:
-            if not config['ssl_keyfile'] or not config['ssl_certfile']:
+
+        cert_pem_file = None
+        cert_key_file = None
+        if config['ws_transport'].get('wss'):
+            if 'certificates' not in config:
                 raise Exception('No SSL keyfile or certfile given')
-            if not os.path.isfile(config['ssl_keyfile']) or not os.path.isfile(config['ssl_certfile']):
+            cert_pem_file = config['certificates'].get('cert_pem')
+            cert_key_file = config['certificates'].get('cert_key')
+            if not os.path.isfile(cert_pem_file) or not os.path.isfile(cert_key_file):
                 raise Exception('SSL keyfile or cerfile not found')
-        '''
-
-        # load the plugins
-
 
         # load the core
-        from januscloud.proxy.core.request import RequestHandler
         request_handler = RequestHandler()
-
-
-
-
-        # set up all server
-
-        server_list = []
 
         # start admin rest api server
         pyramid_config = Configurator()
@@ -57,36 +45,28 @@ def main():
         pyramid_config.include('januscloud.proxy.rest', route_prefix=config['admin_api']['api_base_path'])
         # TODO register service to pyramid registry
         # pyramid_config.registry.das_mngr = das_mngr
+
+        # set up all server
+        server_list = []
         rest_server = WSGIServer(
             config['admin_api']['http_listen'],
             pyramid_config.make_wsgi_app(),
             log=logging.getLogger('rest server')
         )
         server_list.append(rest_server)
-        log.info('Admin RESTAPI server listens on http://{0}'.format(config['admin_api']['http_listen']))
-
-        # start ws transport server
         if config['ws_transport']['wss']:
-            # TODO replace lambda with incoming connection handling function
             wss_server = WSServer(
-                config['ws_transport']['wss_listen'],
+                config['ws_transport']['ws_listen'],
                 request_handler,
-                keyfile=config['certificates']['cert_key'],
-                certfile=config['ssl_certfile']
+                keyfile=cert_key_file,
+                certfile=cert_pem_file
             )
             server_list.append(wss_server)
             log.info('Transport wss server listens at wss://{0}'.format(config['ws_transport']['wss_listen']))
-
         if config['ws_transport']['ws']:
-            # TODO replace lambda with incoming connection handling function
-            ws_server = WSServer(
-                config['ws_transport']['ws_listen'],
-                request_handler)
-
+            ws_server = WSServer(config['ws_transport']['ws_listen'], request_handler)
             server_list.append(ws_server)
-            log.info('Transport ws server listens at ws://{0}'.format(config['ws_transport']['wss_listen']))
-
-        log.info('Janus Proxy is launched successfully')
+        log.info('Started Janus Proxy')
 
         def stop_server():
             log.info('Janus Proxy receives signals to quit...')
