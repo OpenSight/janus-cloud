@@ -56,7 +56,7 @@ def main():
         server_list.append(rest_server)
         if config['ws_transport']['wss']:
             wss_server = WSServer(
-                config['ws_transport']['ws_listen'],
+                config['ws_transport']['wss_listen'],
                 request_handler,
                 keyfile=cert_key_file,
                 certfile=cert_pem_file
