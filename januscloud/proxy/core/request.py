@@ -102,9 +102,9 @@ class Request(object):
 
 class RequestHandler(object):
 
-    def __init__(self, fontend_session_mgr=None, plugin_list=[], proxy_conf={}):
-        self._fontend_session_mgr = fontend_session_mgr
-        self._plugins_list = plugin_list
+    def __init__(self, frontend_session_mgr=None, plugin_list=[], proxy_conf={}):
+        self._frontend_session_mgr = frontend_session_mgr
+        self._plugin_list = plugin_list
         self._proxy_conf = proxy_conf
 
         pass
@@ -113,7 +113,7 @@ class RequestHandler(object):
         if session_id == 0:
             raise JanusCloudError(JANUS_ERROR_INVALID_REQUEST_PATH, "Unhandled request '{}' at this path".format(
                                   request.janus))
-        session = self._fontend_session_mgr.find_session(session_id)
+        session = self._frontend_session_mgr.find_session(session_id)
         session.activate()
         return session
 
@@ -154,14 +154,14 @@ class RequestHandler(object):
 
         params = create_params_schema.validate(request)
         session_id = params.get('id', 0)
-        session = self._fontend_session_mgr.create_new_session(session_id, request.transport)
+        session = self._frontend_session_mgr.create_new_session(session_id, request.transport)
         return create_janus_msg('success', 0, request.transaction, data={'id': session.session_id})
 
     def _handle_destroy(self, request):
         if request.session_id == 0:
             raise JanusCloudError(JANUS_ERROR_INVALID_REQUEST_PATH, "Unhandled request '{}' at this path".format(
                                   request.janus))
-        self._fontend_session_mgr.destroy_session(request.session_id)
+        self._frontend_session_mgr.destroy_session(request.session_id)
         return create_janus_msg('success', request.session_id, request.transaction)
 
     def _handle_keepalive(self, request):
@@ -205,19 +205,22 @@ class RequestHandler(object):
         """
 
         try:
+            log.debug('Request ({}) is incoming'.format(request.message))
             handler = getattr(self, '_handle_' + request.janus)
-            if handler is None or self._fontend_session_mgr is None:
+            if handler is None or self._frontend_session_mgr is None:
                 raise JanusCloudError('Unknown request \'{0}\''.format(request.janus), JANUS_ERROR_UNKNOWN_REQUEST)
             # TODO check secret valid
-            return handler(request)
+            response = handler(request)
+            log.debug('Response ({}) is to return'.format(response))
+            return response
         except Exception as e:
-            log.warn('Request ({}) processing failed'.format(Request.message), exc_info=True)
+            log.warn('Request ({}) processing failed'.format(request.message), exc_info=True)
             return error_to_janus_msg(request.session_id, request.transport_session, e)
 
     def transport_gone(self, transport):
         """ notify transport session is closed by the transport module """
-        if self._fontend_session_mgr:
-            self._fontend_session_mgr.transport_gone(transport)
+        if self._frontend_session_mgr:
+            self._frontend_session_mgr.transport_gone(transport)
 
 
 if __name__ == '__main__':

@@ -47,7 +47,10 @@ config_schema = Schema({
 
 
 def load_conf(path):
-    config = parse_config(path, config_schema)
+    if path is None or path == '':
+        config = config_schema.validate({})
+    else:
+        config = parse_config(path, config_schema)
 
     # set up the default cert pathname
     if config['certificates'].get('cert_key') is None:

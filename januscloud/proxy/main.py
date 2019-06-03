@@ -11,13 +11,12 @@ from pyramid.renderers import JSON
 from januscloud.common.utils import CustomJSONEncoder
 from januscloud.common.logger import default_config as default_log_config
 from januscloud.transport.ws import WSServer
-from januscloud.proxy.core.request import RequestHandler
 from januscloud.proxy.config import load_conf
 
 
 def main():
 
-    default_log_config(debug=False)
+    default_log_config(debug=True)
     import logging
     log = logging.getLogger(__name__)
 
@@ -32,10 +31,12 @@ def main():
 
         # print(cert_pem_file)
 
-
+        from januscloud.proxy.core.frontend_session import FrontendSessionManager
+        frontend_session_mgr = FrontendSessionManager(session_timeout=config['general']['session_timeout'])
 
         # load the core
-        request_handler = RequestHandler()
+        from januscloud.proxy.core.request import RequestHandler
+        request_handler = RequestHandler(frontend_session_mgr=frontend_session_mgr, proxy_conf=config)
 
         # start admin rest api server
         pyramid_config = Configurator()

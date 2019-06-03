@@ -127,7 +127,7 @@ class FrontendSessionManager(object):
             try:
                 session.destroy()
             except Exception as e:
-                log.exception('Failed to destroy gone session "{}"'.format(session_id))
+                log.exception('Failed to destroy transport-gone session "{}"'.format(session_id))
 
     def _check_session_timeout_routine(self):
         while True:

@@ -124,7 +124,7 @@ class WSServer(object):
         if keyfile or certfile:
             self._server = WSGIServer(
                 self._listen,
-                WebSocketWSGIApplication(handler_cls=WSServerConn),
+                WebSocketWSGIApplication(protocols=['janus-protocol'], handler_cls=WSServerConn),
                 log=logging.getLogger('websocket server'),
                 keyfile=keyfile,
                 certfile=certfile
@@ -132,7 +132,7 @@ class WSServer(object):
         else:
             self._server = WSGIServer(
                 self._listen,
-                WebSocketWSGIApplication(handler_cls=WSServerConn),
+                WebSocketWSGIApplication(protocols=['janus-protocol'], handler_cls=WSServerConn),
                 log=logging.getLogger('websocket server'),
             )
         self._server.set_environ(
