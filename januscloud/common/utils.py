@@ -5,7 +5,8 @@ import datetime
 from .error import JanusCloudError
 import sys
 import traceback
-
+import random
+import time
 
 class CustomJSONEncoder(json.JSONEncoder):
 
@@ -49,7 +50,7 @@ def create_janus_msg(status, session_id=0, transaction=None, **kwargs):
     return msg
 
 
-def janus_cloud_error_to_janus_msg(session_id=0, transaction=None, exception=None):
+def error_to_janus_msg(session_id=0, transaction=None, exception=None):
     """ convert a Error exception to a message in dict form """
     error = {}
     if isinstance(exception, JanusCloudError):
@@ -63,3 +64,11 @@ def janus_cloud_error_to_janus_msg(session_id=0, transaction=None, exception=Non
     tb_list = traceback.format_list(traceback.extract_tb(tb)[-10:])
     error["traceback"] = tb_list
     return create_janus_msg("error", session_id, transaction, error=error)
+
+
+def get_monotonic_time():
+    return time.clock_gettime(time.CLOCK_MONOTONIC)
+
+
+def random_uint64():
+    return random.randint(1, 9007199254740992)

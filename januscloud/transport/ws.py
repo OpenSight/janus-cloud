@@ -111,13 +111,20 @@ class WSServerConn(WebSocket):
 class WSServer(object):
 
     def __init__(self, listen, request_handler, msg_handler_pool_size=1024, keyfile=None, certfile=None):
+        """
+        :param listen: string ip:port
+        :param request_handler: instance of januscloud.proxy.core.request:RequestHandler
+        :param msg_handler_pool_size:
+        :param keyfile:
+        :param certfile:
+        """
         self._msg_handler_pool = Pool(size=msg_handler_pool_size)
         self._request_handler = request_handler
         self._listen = listen
         if keyfile or certfile:
             self._server = WSGIServer(
                 self._listen,
-                WebSocketWSGIApplication(handler_cls=WSServerConn),
+                WebSocketWSGIApplication(protocols=['janus-protocol'], handler_cls=WSServerConn),
                 log=logging.getLogger('websocket server'),
                 keyfile=keyfile,
                 certfile=certfile
@@ -125,7 +132,7 @@ class WSServer(object):
         else:
             self._server = WSGIServer(
                 self._listen,
-                WebSocketWSGIApplication(handler_cls=WSServerConn),
+                WebSocketWSGIApplication(protocols=['janus-protocol'], handler_cls=WSServerConn),
                 log=logging.getLogger('websocket server'),
             )
         self._server.set_environ(
@@ -135,7 +142,7 @@ class WSServer(object):
             }
         )
 
-    def server_forever(self):
+    def serve_forever(self):
         log.info("Starting websocket server on {0}".format(self._listen))
         self._server.serve_forever()
 
