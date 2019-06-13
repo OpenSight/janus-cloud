@@ -50,6 +50,7 @@ class FrontendSession(object):
         self.ts = None
         # destroy all handles on it
 
+        log.info('session: {} has destroyed '.format(self.session_id))
 
     def transport_claim(self, new_transport):
         if self.ts:
@@ -68,7 +69,7 @@ class FrontendSession(object):
     def attach_handle(self, handle_id=0):
         pass
 
-    def detach_handle(self, handle_id):
+    def _remove_handle(self, handle_id):
         pass
 
 
@@ -86,7 +87,7 @@ class FrontendSessionManager(object):
             while session_id in self._sessions:
                 session_id = random_uint64()
         if session_id in self._sessions:
-            raise JanusCloudError(JANUS_ERROR_SESSION_CONFLICT, 'Session ID already in use')
+            raise JanusCloudError('Session ID already in use', JANUS_ERROR_SESSION_CONFLICT)
         session = FrontendSession(session_id, transport)
         self._sessions[session_id] = session
         if transport:
@@ -100,14 +101,14 @@ class FrontendSessionManager(object):
         session = self._sessions.get(session_id)
         if session is None:
             log.error("Couldn't find any session {}".format(session_id))
-            raise JanusCloudError(JANUS_ERROR_SESSION_NOT_FOUND, 'No such session {}'.format(session_id))
+            raise JanusCloudError('No such session {}'.format(session_id), JANUS_ERROR_SESSION_NOT_FOUND)
         return session
 
     def destroy_session(self, session_id):
         session = self._sessions.pop(session_id, None)
         if session is None:
             log.error("Couldn't find any session {}".format(session_id))
-            raise JanusCloudError(JANUS_ERROR_SESSION_NOT_FOUND, 'No such session {}'.format(session_id))
+            raise JanusCloudError('No such session {}'.format(session_id), JANUS_ERROR_SESSION_NOT_FOUND)
 
         transport = session.ts
         session.destroy()
@@ -116,12 +117,13 @@ class FrontendSessionManager(object):
 
     def transport_gone(self, transport):
         gone_sessions = []
-        for session_id, session in self._sessions.items():
+        for session in self._sessions.values():
             if session.ts == transport:
                 # destroy the session because of the underlayer transport session is gone
-                log.debug('  -- Session "{}" will be over for transport gone '.format(session_id))
-                self._sessions.pop(session_id, None)
                 gone_sessions.append(session)
+        for session in gone_sessions:
+                log.debug('  -- Session "{}" will be over for transport gone '.format(session.session_id))
+                self._sessions.pop(session.session_id, None)
         for session in gone_sessions:
             session_id = session.session_id
             try:
@@ -135,10 +137,12 @@ class FrontendSessionManager(object):
                 # session timeout check is enable
                 now = get_monotonic_time()
                 timeout_sessions = []
-                for sessionid, session in self._sessions.items():
+                for session in self._sessions.values():
                     if now - session.last_activity > self._session_timeout:
-                        self._sessions.pop(session.session_id, None) # avoid future usage
                         timeout_sessions.append(session)
+                for session in timeout_sessions:
+                    self._sessions.pop(session.session_id, None)  # avoid future usage
+
                 # kick out all timeout session
                 for session in timeout_sessions:
                     try:
@@ -161,9 +165,6 @@ class FrontendSessionManager(object):
         if transport:
             # notify the transport
             transport.session_over(session_id, True, False)
-
-
-
 
 
 

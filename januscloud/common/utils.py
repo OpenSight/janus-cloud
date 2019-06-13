@@ -2,11 +2,12 @@
 import json
 import base64
 import datetime
-from .error import JanusCloudError
+from .error import JanusCloudError, JANUS_ERROR_INVALID_ELEMENT_TYPE
 import sys
 import traceback
 import random
 import time
+from .schema import SchemaError
 
 class CustomJSONEncoder(json.JSONEncoder):
 
@@ -39,9 +40,9 @@ class CustomJSONEncoder(json.JSONEncoder):
             return json.JSONEncoder.default(self, o)
 
 
-def create_janus_msg(status, session_id=0, transaction=None, **kwargs):
+def create_janus_msg(method, session_id=0, transaction=None, **kwargs):
     """ create a basic janus message"""
-    msg = {"janus": str(status)}
+    msg = {"janus": str(method)}
     if session_id > 0:
         msg["session_id"] = session_id
     if transaction:
@@ -55,6 +56,9 @@ def error_to_janus_msg(session_id=0, transaction=None, exception=None):
     error = {}
     if isinstance(exception, JanusCloudError):
         error["code"] = exception.code
+        error["reason"] = str(exception)
+    elif isinstance(exception, SchemaError):
+        error["code"] = JANUS_ERROR_INVALID_ELEMENT_TYPE
         error["reason"] = str(exception)
     else:
         error["code"] = 500

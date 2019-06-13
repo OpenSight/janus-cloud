@@ -22,11 +22,23 @@ class WSServerConn(WebSocket):
     DEFAULT_MSG_HANDLE_THREAD_POOL_SIZE = 8
 
     def __init__(self, *args, **kwargs):
-        self._msg_encoder = kwargs.pop('msg_encoder', None) or self.DEFAULT_ENCODER
-        self._msg_decoder = kwargs.pop('msg_decoder', None) or self.DEFAULT_DECODER
+
+        super(WSServerConn, self).__init__(*args, **kwargs)
+
+        json_indent = self.environ.get('json_indent')
+        if json_indent == 'indented':
+            self._msg_encoder = json.JSONEncoder(indent=3)
+        elif json_indent == 'plain':
+            self._msg_encoder = json.JSONEncoder(indent=None)
+        elif json_indent == 'compact':
+            self._msg_encoder = json.JSONEncoder(indent=None, separators=(',', ':'))
+        else:
+            self._msg_encoder = self.DEFAULT_ENCODER
+
+        self._msg_decoder = self.DEFAULT_DECODER
+
         self._recv_msg_cbk = None
         self._closed_cbk = None
-        super(WSServerConn, self).__init__(*args, **kwargs)
 
     def __str__(self):
         return 'websocket server connection with {0}'.format(self.peer_address)
@@ -92,7 +104,7 @@ class WSServerConn(WebSocket):
             raise Exception('Already closed: {0}'.format(self))
         with gevent.Timeout(seconds=timeout):
             self.send(self._msg_encoder.encode(message), binary=False)
-        # log.debug("Sent message to {0}: {1}".format(self, msg))
+        #log.debug("Sent message to {0}: {1}".format(self, self._msg_encoder.encode(message)))
 
     def session_created(self, session_id=""):
         pass
@@ -110,7 +122,7 @@ class WSServerConn(WebSocket):
 
 class WSServer(object):
 
-    def __init__(self, listen, request_handler, msg_handler_pool_size=1024, keyfile=None, certfile=None):
+    def __init__(self, listen, request_handler, msg_handler_pool_size=1024, indent='indented', keyfile=None, certfile=None):
         """
         :param listen: string ip:port
         :param request_handler: instance of januscloud.proxy.core.request:RequestHandler
@@ -118,6 +130,9 @@ class WSServer(object):
         :param keyfile:
         :param certfile:
         """
+        if msg_handler_pool_size == 0:
+            msg_handler_pool_size = None
+
         self._msg_handler_pool = Pool(size=msg_handler_pool_size)
         self._request_handler = request_handler
         self._listen = listen
@@ -139,6 +154,7 @@ class WSServer(object):
             {
                 'app.recv_msg_cbk': self._async_incoming_msg_handler,
                 'app.closed_cbk': self._request_handler.transport_gone,
+                'json_indent': indent
             }
         )
 

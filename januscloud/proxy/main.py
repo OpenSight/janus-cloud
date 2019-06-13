@@ -52,18 +52,25 @@ def main():
             pyramid_config.make_wsgi_app(),
             log=logging.getLogger('rest server')
         )
+
         server_list.append(rest_server)
         if config['ws_transport']['wss']:
             wss_server = WSServer(
                 config['ws_transport']['wss_listen'],
                 request_handler,
+                msg_handler_pool_size=config['ws_transport']['max_greenlet_num'],
+                indent=config['ws_transport']['json'],
                 keyfile=cert_key_file,
                 certfile=cert_pem_file
+
             )
             server_list.append(wss_server)
 
         if config['ws_transport']['ws']:
-            ws_server = WSServer(config['ws_transport']['ws_listen'], request_handler)
+            ws_server = WSServer(config['ws_transport']['ws_listen'],
+                                 request_handler,
+                                 msg_handler_pool_size=config['ws_transport']['max_greenlet_num'],
+                                 indent=config['ws_transport']['json'])
             server_list.append(ws_server)
 
         log.info('Started Janus Proxy')

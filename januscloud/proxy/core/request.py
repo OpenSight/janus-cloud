@@ -111,8 +111,8 @@ class RequestHandler(object):
 
     def _get_session(self, session_id):
         if session_id == 0:
-            raise JanusCloudError(JANUS_ERROR_INVALID_REQUEST_PATH, "Unhandled request '{}' at this path".format(
-                                  request.janus))
+            raise JanusCloudError("Unhandled request '{}' at this path".format(request.janus),
+                                  JANUS_ERROR_INVALID_REQUEST_PATH)
         session = self._frontend_session_mgr.find_session(session_id)
         session.activate()
         return session
@@ -120,8 +120,8 @@ class RequestHandler(object):
     def _get_plugin_handle(self, session_id, handle_id):
         session = self._get_session(session_id)
         if handle_id == 0:
-            raise JanusCloudError(JANUS_ERROR_INVALID_REQUEST_PATH, "Unhandled request '{}' at this path".format(
-                                  request.janus))
+            raise JanusCloudError("Unhandled request '{}' at this path".format(request.janus),
+                                  JANUS_ERROR_INVALID_REQUEST_PATH)
         handle = session.get_handle(handle_id)
         return handle
 
@@ -152,15 +152,15 @@ class RequestHandler(object):
                 AutoDel(str): object  # for all other key we don't care
         })
 
-        params = create_params_schema.validate(request)
+        params = create_params_schema.validate(request.message)
         session_id = params.get('id', 0)
         session = self._frontend_session_mgr.create_new_session(session_id, request.transport)
         return create_janus_msg('success', 0, request.transaction, data={'id': session.session_id})
 
     def _handle_destroy(self, request):
         if request.session_id == 0:
-            raise JanusCloudError(JANUS_ERROR_INVALID_REQUEST_PATH, "Unhandled request '{}' at this path".format(
-                                  request.janus))
+            raise JanusCloudError("Unhandled request '{}' at this path".format(request.janus),
+                                  JANUS_ERROR_INVALID_REQUEST_PATH)
         self._frontend_session_mgr.destroy_session(request.session_id)
         return create_janus_msg('success', request.session_id, request.transaction)
 
@@ -205,7 +205,7 @@ class RequestHandler(object):
         """
 
         try:
-            log.debug('Request ({}) is incoming'.format(request.message))
+            log.debug('Request ({}) is incoming to handle'.format(request.message))
             handler = getattr(self, '_handle_' + request.janus)
             if handler is None or self._frontend_session_mgr is None:
                 raise JanusCloudError('Unknown request \'{0}\''.format(request.janus), JANUS_ERROR_UNKNOWN_REQUEST)
@@ -215,7 +215,7 @@ class RequestHandler(object):
             return response
         except Exception as e:
             log.warn('Request ({}) processing failed'.format(request.message), exc_info=True)
-            return error_to_janus_msg(request.session_id, request.transport_session, e)
+            return error_to_janus_msg(request.session_id, request.transaction, e)
 
     def transport_gone(self, transport):
         """ notify transport session is closed by the transport module """

@@ -53,7 +53,9 @@ class Client(object):
 
 
 if __name__ == '__main__':
+
     test_config(debug=True)
+    """
     gevent.spawn(WSServer('127.0.0.1:9999', EchoServer(), keyfile='../../certs/mycert.key', certfile='../../certs/mycert.pem').server_forever)
     time.sleep(1)
     c = Client('wss://127.0.0.1:9999')
@@ -61,10 +63,22 @@ if __name__ == '__main__':
     """
     # example to connect to Janus
     def incoming_msg(msg):
+        print('received message:')
         print(msg)
-    client = WSClient("wss://192.168.0.221/ws/media", incoming_msg, protocols=('janus-protocol',))
-    client.send_msg({'janus': 'info', 'transaction': 'abcdef'})
+
+    def on_closed():
+        print('Client closed')
+    client = WSClient("ws://127.0.0.1:8288", incoming_msg, on_closed, protocols=('janus-protocol',))
+    client.send_message({'janus': 'info', 'transaction': 'abcdef'})
+    print('after send_message')
     time.sleep(5)
+    print('before close')
     client.close()
-    """
+    print('after close, client terminated:{}'.format(client.terminated))
+    time.sleep(1)
+
+    print('after sleep, client terminated:{}'.format(client.terminated))
+
+    time.sleep(5)
+
 
