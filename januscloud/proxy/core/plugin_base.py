@@ -6,6 +6,7 @@ from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
     FloatVal, AutoDel
+from januscloud.proxy.core.frontend_handle_base import FrontendHandleBase
 
 log = logging.getLogger(__name__)
 
@@ -31,11 +32,12 @@ class PluginBase(object):
     def get_author(self):
         pass
 
-    def create_handle(self):
+    def get_package(self):
         pass
 
-if __name__ == '__main__':
-    pass
+    def create_handle(self, handle_id, session):
+        pass
+
 
 
 
