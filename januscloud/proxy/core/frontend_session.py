@@ -69,7 +69,7 @@ class FrontendSession(object):
     def attach_handle(self, handle_id=0):
         pass
 
-    def _remove_handle(self, handle_id):
+    def on_handle_detach(self, handle_id):
         pass
 
 
