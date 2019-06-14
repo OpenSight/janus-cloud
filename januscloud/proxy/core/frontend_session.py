@@ -66,10 +66,10 @@ class FrontendSession(object):
     def activate(self):
         self.last_activity = get_monotonic_time()
 
-    def attach_handle(self, handle_id=0):
+    def attach_handle(self, plugin_package_name, opaque_id=None):
         pass
 
-    def on_handle_detach(self, handle_id):
+    def detach_handle(self, handle_id):
         pass
 
 

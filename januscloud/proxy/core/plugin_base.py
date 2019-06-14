@@ -10,6 +10,8 @@ from januscloud.proxy.core.frontend_handle_base import FrontendHandleBase
 
 log = logging.getLogger(__name__)
 
+_plugins = {}
+
 
 class PluginBase(object):
     """ This base class for plugin """
@@ -39,7 +41,12 @@ class PluginBase(object):
         pass
 
 
+def get_plugin(plugin_package_name, default=None):
+    return _plugins.get(plugin_package_name, default)
 
+
+def register_plugin(plugin_package_name, plugin):
+    _plugins[plugin_package_name] = plugin
 
 
 

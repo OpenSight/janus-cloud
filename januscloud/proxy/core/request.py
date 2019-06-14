@@ -2,10 +2,13 @@
 
 import logging
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg
-from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST, JANUS_ERROR_INVALID_REQUEST_PATH
+from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST, JANUS_ERROR_INVALID_REQUEST_PATH, \
+    JANUS_ERROR_PLUGIN_MESSAGE, JANUS_ERROR_HANDLE_NOT_FOUND, JANUS_ERROR_SESSION_NOT_FOUND, \
+    JANUS_ERROR_MISSING_MANDATORY_ELEMENT, JANUS_ERROR_INVALID_JSON
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
-    Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
+    Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, StrVal, \
     FloatVal, AutoDel
+from januscloud.proxy.core.frontend_handle_base import JANUS_PLUGIN_OK, JANUS_PLUGIN_OK_WAIT
 
 log = logging.getLogger(__name__)
 
@@ -109,20 +112,25 @@ class RequestHandler(object):
 
         pass
 
-    def _get_session(self, session_id):
-        if session_id == 0:
+    def _get_session(self, request):
+        if request.session_id == 0:
             raise JanusCloudError("Unhandled request '{}' at this path".format(request.janus),
                                   JANUS_ERROR_INVALID_REQUEST_PATH)
-        session = self._frontend_session_mgr.find_session(session_id)
+        session = self._frontend_session_mgr.find_session(request.session_id)
+        if session is None:
+            raise JanusCloudError('No such session {}'.format(request.session_id), JANUS_ERROR_SESSION_NOT_FOUND)
         session.activate()
         return session
 
-    def _get_plugin_handle(self, session_id, handle_id):
-        session = self._get_session(session_id)
-        if handle_id == 0:
+    def _get_plugin_handle(self, request):
+        session = self._get_session(request.session_id)
+        if request.handle_id == 0:
             raise JanusCloudError("Unhandled request '{}' at this path".format(request.janus),
                                   JANUS_ERROR_INVALID_REQUEST_PATH)
-        handle = session.get_handle(handle_id)
+        handle = session.get_handle(request.handle_id)
+        if handle is None:
+            raise JanusCloudError("No such handle {} in session {}".format(request.handle_id, request.session_id),
+                                  JANUS_ERROR_HANDLE_NOT_FOUND)
         return handle
 
     def _handle_info(self, request):
@@ -166,32 +174,94 @@ class RequestHandler(object):
 
     def _handle_keepalive(self, request):
         log.debug('Got a keep-alive on session {0}'.format(request.session_id))
-        session = self._get_session(request.session_id)
+        session = self._get_session(request)
         return create_janus_msg('ack', request.session_id, request.transaction)
 
     def _handle_claim(self, request):
-        session = self._get_session(request.session_id)
+        session = self._get_session(request)
         session.transport_claim(request.transport)
         return create_janus_msg('success', request.session_id, request.transaction)
 
     def _handle_attach(self, request):
-        return {}
+        session = self._get_session(request)
+        attach_params_schema = Schema({
+                'plugin': StrVal(max_len=64),
+                Optional('opaque_id'): StrVal(max_len=64),
+                AutoDel(str): object  # for all other key we don't care
+        })
+        params = attach_params_schema.validate(request.message)
+        handle = session.attach_handle(**params)
+        return create_janus_msg('success', request.session_id, request.transaction, data={'id': handle.handle_id})
 
     def _handle_detach(self, request):
-        return {}
+        self._get_plugin_handle(request) # check handle exist
+        session = self._get_session(request)
+        session.detach_handle(request.handle_id)
+        return create_janus_msg('success', request.session_id, request.transaction)
 
     def _handle_hangup(self, request):
-        return {}
+        handle = self._get_plugin_handle(request)
+        handle.handle_hangup()
+        return create_janus_msg('success', request.session_id, request.transaction)
 
     def _handle_message(self, request):
+
+        message_params_schema = Schema({
+                'body': dict,
+                Optional('jsep'): dict,
+                AutoDel(str): object  # for all other key we don't care
+        })
+        params = message_params_schema.validate(request.message)
+
         # dispatch to plugin handle
-        return {}
+        handle = self._get_plugin_handle(request)
+        result, content = handle.handle_message(request.transaction, **params)
+        if result == JANUS_PLUGIN_OK:
+            if content is None or not isinstance(content, dict):
+                raise JanusCloudError(
+                    "Plugin didn't provide any content for this synchronous response" if content is None
+                    else "Plugin returned an invalid JSON response",
+                    JANUS_ERROR_PLUGIN_MESSAGE)
+            response = create_janus_msg('success', request.session_id, request.transaction, sender=request.handle_id)
+            if handle.opaque_id:
+                response['opaque_id'] = handle.opaque_id
+            response['plugindata'] = {
+                'plugin': handle.plugin_package_name,
+                'data': content
+            }
+        elif result == JANUS_PLUGIN_OK_WAIT:
+            response = create_janus_msg('ack', request.session_id, request.transaction)
+            if content:
+                response['hint'] = content
+        else:
+            raise JanusCloudError('Plugin returned a severe (unknown) error', JANUS_ERROR_PLUGIN_MESSAGE)
+
+        return response
 
     def _handle_trickle(self, request):
 
-        # dispatch to plugin handle
+        trickle_params_schema = Schema({
+                Optional('candidate'): dict,
+                Optional('candidates'): [dict],
+                AutoDel(str): object  # for all other key we don't care
+        })
+        params = trickle_params_schema.validate(request.message)
+        candidate = params.get('candidate')
+        candidates = params.get('candidates')
 
-        return {}
+        if candidate is None and candidates is None:
+            raise JanusCloudError('Missing mandatory element (candidate|candidates)',
+                                  JANUS_ERROR_MISSING_MANDATORY_ELEMENT)
+
+        if candidate and candidates:
+            raise JanusCloudError('Can\'t have both candidate and candidates',
+                                  JANUS_ERROR_INVALID_JSON)
+
+        # dispatch to plugin handle
+        handle = self._get_plugin_handle(request)
+        handle.handle_trickle(candidate=candidate, candidates=candidates)
+
+        return create_janus_msg('ack', request.session_id, request.transaction)
 
     def incoming_request(self, request):
         """ handle the request from the transport module
@@ -231,9 +301,9 @@ if __name__ == '__main__':
         'session_id': 12345,
         'handle_id': 6789
     }
-    request = Request(message=income_message)
+    my_request = Request(message=income_message)
 
-    reply = handler.incoming_request(request)
+    reply = handler.incoming_request(my_request)
 
     print(reply)
 
