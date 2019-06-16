@@ -34,8 +34,9 @@ certificates:
 # enabled or not. list all the plugin's module path(e.g. januscloud.plugins.echotest)
 # below. 
 plugins:   
-  - januscloud.proxy.plugin.echotest:create
-  - januscloud.proxy.plugin.videoroom:create
+  - januscloud.proxy.plugin.dummytest:create
+#  - januscloud.proxy.plugin.echotest:create
+#  - januscloud.proxy.plugin.videoroom:create
 
 # Configuration for the websocket transport. 
 # Websocket transport module outputs the Janus api on websocket protocol just as Janus server

@@ -4,11 +4,12 @@ from januscloud.common.schema import Schema, StrVal, Default, AutoDel, Optional,
     StrRe, EnumVal
 from januscloud.common.confparser import parse as parse_config
 from pkg_resources import Requirement, resource_filename
+import os
 
 config_schema = Schema({
     Optional("general"): Default({
         Optional("daemonize"): Default(BoolVal(), default=False),
-        Optional("configs_folder"): Default(StrVal(), default='/etc/janus-cloud'),
+        Optional("configs_folder"): Default(StrVal(), default=''),
         Optional("server_name"): Default(StrVal(min_len=1, max_len=64), default='MyJanusProxy'),
         Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=60),
         AutoDel(str): object  # for all other key we don't care
@@ -60,6 +61,12 @@ def load_conf(path):
 
     # check other configure option is valid or not
     # TODO
+
+    if config['general']['configs_folder'] == '':
+        if path is None or path == '':
+            config['general']['configs_folder'] = '/etc/janus-cloud'
+        else:
+            config['general']['configs_folder'] = os.path.dirname(path)
 
     return config
 

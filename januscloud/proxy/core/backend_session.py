@@ -54,14 +54,14 @@ class BackendTransaction(object):
 class BackendSession(object):
     """ This backend session represents a session of the backend Janus server """
 
-    def __init__(self, url, keepalive_interval, auto_destory=None):
+    def __init__(self, url, keepalive_interval, auto_destroy=False):
         self.url = url
         self._ws_client = None
         self._transactions = {}
         self.session_id = 0
         self.state = BACKEND_SESSION_STATE_CREATING
         self._handles = {}
-        self._auto_destroy = auto_destory
+        self._auto_destroy = int(auto_destroy)
         self._auto_destroy_greenlet = None
         self._keepalive_interval = keepalive_interval
         self._keepalive_greenlet = None
@@ -94,11 +94,11 @@ class BackendSession(object):
             raise JanusCloudError('Session has destroy for Janus server: {}'.format(self.url),
                                   JANUS_ERROR_SERVICE_UNAVAILABLE)
 
+        attach_request_msg = create_janus_msg('attach', plugin=plugin_package_name)
         if opaque_id:
-            attach_request_msg = create_janus_msg('attach', plugin=plugin_package_name, opaque_id=opaque_id)
-        else:
-            attach_request_msg = create_janus_msg('attach', plugin=plugin_package_name)
-        response = self.send_request(attach_request_msg)  # block for IO
+            attach_request_msg['opaque_id'] = opaque_id
+
+        response = self.send_request(attach_request_msg)  # would block for IO
         if response['janus'] == 'success':
              handle_id = response['data']['id']
         elif response['janus'] == 'error':
@@ -128,7 +128,6 @@ class BackendSession(object):
 
     def on_handle_detached(self, handle_id):
         self._handles.pop(handle_id, None)
-
 
     def send_request(self, msg, ignore_ack=True, timeout=30):
 
@@ -192,7 +191,9 @@ class BackendSession(object):
             self._ws_client = None
 
     def _auto_destroy_routine(self):
-        pass
+        log.info('Backend session {} is auto destroyed'.format(self.session_id))
+        self._auto_destroy_greenlet = None
+        self.destroy()
 
     def _recv_msg_cbk(self, msg):
 
@@ -200,10 +201,14 @@ class BackendSession(object):
             transaction = self._transactions.get(msg['transaction'])
             if transaction:
                 transaction.response = msg
+                return
         elif 'sender' in msg:
-            handle = self._handles['sender']
+            handle = self._handles[msg['sender']]
             if handle:
                 handle.on_async_event(msg)
+                return
+
+        log.warn('Receive a invalid message {} on session {} for server {}'.format(msg, self.session_id, self.url))
 
     def _genrate_new_tid(self):
         tid = str(random_uint64())
@@ -230,8 +235,10 @@ class BackendSession(object):
         while self.state == BACKEND_SESSION_STATE_ACTIVE:
             try:
                 # if there is no handle existed and auto destroy is enabled, just schedule the destroy route
-                if not self._handles and self._auto_destroy:
-                    self._auto_destroy_greenlet = gevent.spawn_later(self._auto_destroy, self._auto_destroy_routine)
+                if not self._handles:
+                    if self._auto_destroy and self._auto_destroy_greenlet is None:
+                        self._auto_destroy_greenlet = gevent.spawn_later(self._auto_destroy, self._auto_destroy_routine)
+
                 self.send_request(keepalive_msg, ignore_ack=False)
 
             except Exception as e:
@@ -244,12 +251,12 @@ class BackendSession(object):
 _sessions = {}
 
 
-def get_backend_session(server_url, keepalive_interval=10):
+def get_backend_session(server_url, keepalive_interval=10, auto_destroy=False):
     session = _sessions.get(server_url)
     if session is None:
         # create new session
         session = \
-            BackendSession(server_url, keepalive_interval=keepalive_interval)
+            BackendSession(server_url, keepalive_interval=keepalive_interval, auto_destroy=auto_destroy)
         try:
             session.init()
         except Exception as e:
@@ -270,10 +277,15 @@ def get_backend_session(server_url, keepalive_interval=10):
 if __name__ == '__main__':
     from januscloud.common.logger import test_config
     test_config(debug=True)
-    session = get_backend_session('ws://127.0.0.1:8188')
+    session = get_backend_session('ws://127.0.0.1:8188', auto_destroy=5)
     print('create session successful')
-    gevent.sleep(20)
+    handle = session.attach_handle('janus.plugin.echotest1')
+    gevent.sleep(5)
+    handle.detach()
+    gevent.sleep(5)
+    print('destroy session')
     session.destroy()
+    gevent.sleep(20)
 
 
 

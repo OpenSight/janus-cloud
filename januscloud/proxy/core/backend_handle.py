@@ -57,7 +57,7 @@ class BackendHandle(object):
         self._session.on_handle_detached(self.handle_id)
         self._session = None
 
-    def send_message(self, params, ignore_ack=False):
+    def send_message(self, params, ignore_ack=True):
         if self._has_detach:
             raise JanusCloudError('backend handle {} has been destroyed'.format(self.handle_id),
                                   JANUS_ERROR_PLUGIN_DETACH)

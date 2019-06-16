@@ -37,7 +37,7 @@ class PluginBase(object):
     def get_package(self):
         pass
 
-    def create_handle(self, handle_id, session):
+    def create_handle(self, handle_id, session, opaque_id=None):
         pass
 
 

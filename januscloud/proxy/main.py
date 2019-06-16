@@ -12,7 +12,7 @@ from januscloud.common.utils import CustomJSONEncoder
 from januscloud.common.logger import default_config as default_log_config
 from januscloud.transport.ws import WSServer
 from januscloud.proxy.config import load_conf
-
+import importlib
 
 def main():
 
@@ -31,10 +31,19 @@ def main():
 
         # print(cert_pem_file)
 
-        from januscloud.proxy.core.frontend_session import FrontendSessionManager
-        frontend_session_mgr = FrontendSessionManager(session_timeout=config['general']['session_timeout'])
+        # load the plugins
+        config_path = config['general']['configs_folder']
+        from januscloud.proxy.core.plugin_base import register_plugin
+        for plugin_str in config['plugins']:
+            module_name, sep, method_name = plugin_str.partition(':')
+            module = importlib.import_module(module_name)
+            plugin = getattr(module, method_name)()
+            plugin.init(config_path)
+            register_plugin(plugin.get_package(), plugin)
 
         # load the core
+        from januscloud.proxy.core.frontend_session import FrontendSessionManager
+        frontend_session_mgr = FrontendSessionManager(session_timeout=config['general']['session_timeout'])
         from januscloud.proxy.core.request import RequestHandler
         request_handler = RequestHandler(frontend_session_mgr=frontend_session_mgr, proxy_conf=config)
 
