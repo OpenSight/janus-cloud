@@ -25,7 +25,6 @@ JANUS_DUMMYTEST_PACKAGE = 'janus.plugin.dummytest'
 class DummyHandle(FrontendHandleBase):
     def __init__(self, handle_id, session, plugin_package_name, opaque_id=None, *args, **kwargs):
         super().__init__(handle_id, session, plugin_package_name, opaque_id, *args, **kwargs)
-        self.pool = Pool(size=1)
 
     def handle_hangup(self):
         log.info('handle_hangup for dummy Handle {}'.format(self.handle_id))
@@ -34,16 +33,16 @@ class DummyHandle(FrontendHandleBase):
         log.info('handle_message for dummy handle {}. transaction:{} body:{} jsep:{}'.
                  format(self.handle_id, transaction, body, jsep))
         if 'async' in body:
-            self.pool.apply_async(self.async_handler, (transaction, body, jsep))
+            self._enqueue_async_message(transaction, body, jsep)
             return JANUS_PLUGIN_OK_WAIT, None
         else:
-            return JANUS_PLUGIN_OK, {'dummytest':'successful'}
+            return JANUS_PLUGIN_OK, {'dummytest': 'successful'}
 
     def handle_trickle(self, candidate=None, candidates=None):
         log.info('handle_trickle for dummy handle {}.candidate:{} candidates:{}'.
                  format(self.handle_id, candidate, candidates))
 
-    def async_message_handler(self, trasaction, body, jsep):
+    def _handle_async_message(self, trasaction, body, jsep):
         self._push_event({'dummytest':'successful'}, jsep, trasaction)
 
 class DummyTestPlugin(PluginBase):

@@ -3,13 +3,15 @@
 import logging
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg, get_monotonic_time, random_uint64
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_SESSION_CONFLICT, \
-    JANUS_ERROR_SESSION_NOT_FOUND
+    JANUS_ERROR_SESSION_NOT_FOUND, JANUS_ERROR_PLUGIN_NOT_FOUND
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
     FloatVal, AutoDel
 import time
 import gevent
 import sys
+
+from januscloud.proxy.core.plugin_base import get_plugin
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +51,10 @@ class FrontendSession(object):
 
         self.ts = None
         # destroy all handles on it
+        for handle in self._handles.values():
+            handle.detach()
+
+        self._handles.clear()
 
         log.info('session: {} has destroyed '.format(self.session_id))
 
@@ -67,11 +73,22 @@ class FrontendSession(object):
         self.last_activity = get_monotonic_time()
 
     def attach_handle(self, plugin_package_name, opaque_id=None):
-        pass
+        plugin = get_plugin(plugin_package_name)
+        if plugin is None:
+            raise JanusCloudError("No such plugin '%s'".format(plugin_package_name), JANUS_ERROR_PLUGIN_NOT_FOUND)
+        handle_id = random_uint64()
+        while handle_id in self._handles:
+            handle_id = random_uint64()
+        handle = plugin.create_handle(handle_id, self, plugin, opaque_id)
+        self._handles[handle_id] = handle
+
+        return handle
 
     def detach_handle(self, handle_id):
-        pass
-
+        handle = self._handles.get(handle_id)
+        if handle is None:
+            return
+        handle.detach()
 
 class FrontendSessionManager(object):
 
