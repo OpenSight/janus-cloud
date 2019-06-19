@@ -21,17 +21,6 @@ JANUS_DUMMYTEST_NAME = 'JANUS DummyTest plugin'
 JANUS_DUMMYTEST_AUTHOR = 'opensight.cn'
 JANUS_DUMMYTEST_PACKAGE = 'janus.plugin.dummytest'
 
-class CA(object):
-    def __init__(self, a, b, c, d=None):
-        print(a,b,c,d)
-
-class CB(CA):
-    def __init__(self, a, b, c, d=None, *args, **kwargs):
-        super().__init__(a, b, c, d, *args, **kwargs)
-
-
-
-
 
 class DummyHandle(FrontendHandleBase):
     def __init__(self, handle_id, session, plugin_package_name, opaque_id=None, *args, **kwargs):
@@ -86,12 +75,6 @@ class DummyTestPlugin(PluginBase):
 def create():
     return DummyTestPlugin()
 
-
-
-
-if __name__ == '__main__':
-    plugin = create()
-    plugin.create_handle('1234', 'sesssion', 'test')
 
 
 
