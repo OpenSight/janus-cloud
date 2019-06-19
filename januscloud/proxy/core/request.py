@@ -123,7 +123,7 @@ class RequestHandler(object):
         return session
 
     def _get_plugin_handle(self, request):
-        session = self._get_session(request.session_id)
+        session = self._get_session(request)
         if request.handle_id == 0:
             raise JanusCloudError("Unhandled request '{}' at this path".format(request.janus),
                                   JANUS_ERROR_INVALID_REQUEST_PATH)

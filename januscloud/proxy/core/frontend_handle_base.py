@@ -35,6 +35,7 @@ class FrontendHandleBase(object):
         self._async_message_queue = Queue(maxsize=1024)
         self._async_message_greenlet = gevent.spawn(self._async_message_handler_routine)
 
+
     def detach(self):
 
         if self._has_destroy:
@@ -43,6 +44,7 @@ class FrontendHandleBase(object):
         if not self._async_message_queue.full():
             self._async_message_queue.put(stop_message)
         self._async_message_greenlet = None
+        log.info('handle {} is detach from plugin {}'.format(self.handle_id, self.plugin_package_name))
 
     def has_destroy(self):
         return self._has_destroy
@@ -62,7 +64,7 @@ class FrontendHandleBase(object):
     def _async_message_handler_routine(self):
         while not self._has_destroy:
             msg = self._async_message_queue.get()
-            if self._has_destroy:
+            if self._has_destroy or msg == stop_message:
                 return
             try:
                 transaction, body, jsep = msg

@@ -3,7 +3,7 @@
 import logging
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg, get_monotonic_time, random_uint64
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_SESSION_CONFLICT, \
-    JANUS_ERROR_SESSION_NOT_FOUND, JANUS_ERROR_PLUGIN_NOT_FOUND
+    JANUS_ERROR_SESSION_NOT_FOUND, JANUS_ERROR_PLUGIN_NOT_FOUND, JANUS_ERROR_PLUGIN_ATTACH
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
     FloatVal, AutoDel
@@ -50,11 +50,13 @@ class FrontendSession(object):
             self._has_destroyed = True
 
         self.ts = None
-        # destroy all handles on it
-        for handle in self._handles.values():
-            handle.detach()
+        detach_handles = self._handles
+        self._handles = {}
 
-        self._handles.clear()
+        # detach all handles on it
+        for handle in detach_handles.values():
+            handle.detach()       # would result into IO block
+        detach_handles.clear()
 
         log.info('session: {} has destroyed '.format(self.session_id))
 
@@ -65,23 +67,24 @@ class FrontendSession(object):
         new_transport.session_claimed(self.session_id)
 
     def get_handle(self, handle_id):
-        if self._has_destroyed:
-            return None
         return self._handles.get(handle_id)
 
     def activate(self):
         self.last_activity = get_monotonic_time()
 
-    def attach_handle(self, plugin_package_name, opaque_id=None):
-        plugin = get_plugin(plugin_package_name)
+    def attach_handle(self, plugin, opaque_id=None):
+        if self._has_destroyed:
+            raise JanusCloudError('session {} has been destroy'.format(self.session_id), JANUS_ERROR_PLUGIN_ATTACH)
+        plugin = get_plugin(plugin)
         if plugin is None:
-            raise JanusCloudError("No such plugin '%s'".format(plugin_package_name), JANUS_ERROR_PLUGIN_NOT_FOUND)
+            raise JanusCloudError("No such plugin '%s'".format(plugin), JANUS_ERROR_PLUGIN_NOT_FOUND)
         handle_id = random_uint64()
         while handle_id in self._handles:
             handle_id = random_uint64()
-        handle = plugin.create_handle(handle_id, self, plugin, opaque_id)
+        handle = plugin.create_handle(handle_id, self, opaque_id)
         self._handles[handle_id] = handle
-
+        log.info('a new handle {} on session {} is attached for plugin {}'.format(
+            handle_id, self.session_id, plugin))
         return handle
 
     def detach_handle(self, handle_id):
@@ -126,7 +129,6 @@ class FrontendSessionManager(object):
         if session is None:
             log.error("Couldn't find any session {}".format(session_id))
             raise JanusCloudError('No such session {}'.format(session_id), JANUS_ERROR_SESSION_NOT_FOUND)
-
         transport = session.ts
         session.destroy()
         if transport:
