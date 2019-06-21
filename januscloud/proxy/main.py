@@ -2,34 +2,45 @@
 import gevent.monkey
 gevent.monkey.patch_all()
 import sys
-import os.path
-import signal
-from gevent.pywsgi import WSGIServer
-from pyramid.config import Configurator
-from pyramid.renderers import JSON
-
-from januscloud.common.utils import CustomJSONEncoder
-from januscloud.common.logger import default_config as default_log_config
-from januscloud.transport.ws import WSServer
 from januscloud.proxy.config import load_conf
-import importlib
+from daemon import DaemonContext
+import os
 
 def main():
+    if len(sys.argv) == 2:
+        config = load_conf(sys.argv[1])
+    else:
+        config = load_conf('/etc/janus-proxy.yml')
 
-    default_log_config(debug=True)
+    if config['general']['daemonize']:
+        with DaemonContext(stdin=sys.stdin,
+                           stdout=sys.stdout,
+                           # working_directory=os.getcwd(),
+                           files_preserve=list(range(3, 100))):
+            do_main(config)
+    else:
+        do_main(config)
+
+
+def do_main(config):
+
+    import signal
+    from gevent.pywsgi import WSGIServer
+    from pyramid.config import Configurator
+    from pyramid.renderers import JSON
+    from januscloud.common.utils import CustomJSONEncoder
+    from januscloud.common.logger import set_root_logger
+    from januscloud.transport.ws import WSServer
+    import importlib
+
+    set_root_logger(**(config['log']))
+
     import logging
     log = logging.getLogger(__name__)
 
     try:
-        if len(sys.argv) == 2:
-            config = load_conf(sys.argv[1])
-        else:
-            config = load_conf('/etc/janus-proxy.yml')
-
         cert_pem_file = config['certificates'].get('cert_pem')
         cert_key_file = config['certificates'].get('cert_key')
-
-        # print(cert_pem_file)
 
         # load the plugins
         config_path = config['general']['configs_folder']
@@ -95,7 +106,7 @@ def main():
 
         serve_forever(server_list)  # serve all server
 
-        log.info("Quit")
+        log.info("Janus-proxy Quit")
 
     except Exception:
         log.exception('Failed to start Janus Proxy')

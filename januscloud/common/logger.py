@@ -22,10 +22,29 @@ def default_config(debug=False):
     if not os.path.exists(log_path):
         os.makedirs(log_path)
     rfh = logging.handlers.RotatingFileHandler(os.path.join(log_path, program_name+'.log'),
-                                               maxBytes=50*1024*1024,
+                                               maxBytes=100*1024*1024,
                                                backupCount=30)
     rfh.setFormatter(formatter)
     root.addHandler(rfh)
+
+
+def set_root_logger(log_to_stdout, log_to_file, debug_level='DEBUG', log_file_size=100*1024*1024, log_file_rotate=10):
+    root = logging.getLogger()
+    root.setLevel(debug_level)
+    formatter = logging.Formatter('%(asctime)s [%(process)d] [%(name)s] [%(levelname)s] - %(message)s')
+    if log_to_stdout:
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setFormatter(formatter)
+        root.addHandler(sh)
+    if log_to_file:
+        log_path = os.path.dirname(log_to_file)
+        if not os.path.exists(log_path):
+            os.makedirs(log_path)
+        rfh = logging.handlers.RotatingFileHandler(log_to_file,
+                                                   maxBytes=log_file_size,
+                                                   backupCount=log_file_rotate)
+        rfh.setFormatter(formatter)
+        root.addHandler(rfh)
 
 
 def test_config(debug=False):

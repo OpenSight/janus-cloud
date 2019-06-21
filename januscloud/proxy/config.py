@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from januscloud.common.schema import Schema, StrVal, Default, AutoDel, Optional, BoolVal, IntVal, \
-    StrRe, EnumVal
+    StrRe, EnumVal, Or
 from januscloud.common.confparser import parse as parse_config
 from pkg_resources import Requirement, resource_filename
 import os
@@ -17,7 +17,9 @@ config_schema = Schema({
     Optional("log"): Default({
         Optional('log_to_stdout'): Default(BoolVal(), default=True),
         Optional('log_to_file'): Default(StrVal(), default=''),
-        Optional('debug_level'): Default(IntVal(), default=4),
+        Optional('debug_level'): Default(EnumVal(['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL']), default='DEBUG'),
+        Optional('log_file_size'): Default(IntVal(), default=104857600),
+        Optional('log_file_rotate'): Default(IntVal(), default=10),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
     Optional("certificates"): Default({
@@ -26,7 +28,7 @@ config_schema = Schema({
         Optional("cert_pwd"): StrVal(),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
-    Optional("plugins"): Default([StrRe('^\S+:\S+$')], default=[]),
+    Optional("plugins"): Default(Or([StrRe('^\S+:\S+$')], None), default=[]),
     Optional("ws_transport"): Default({
         Optional("json"): Default(EnumVal(['indented', 'plain', 'compact']), default='indented'),
         Optional("pingpong_trigger"): Default(IntVal(min=0, max=3600), default=0),

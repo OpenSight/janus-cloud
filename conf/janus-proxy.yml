@@ -2,13 +2,13 @@
 
 # General configuration. for some basic configuration 
 general:
-  #daemonize: true						# Whether Janus-proxy should run as a daemon
+  daemonize: false                      # Whether Janus-proxy should run as a daemon
                                         # or not (default=run in foreground)
-  configs_folder: "/etc/janus-cloud"    # Configuration files folder, default is the same 
+  # configs_folder: "/etc/janus-cloud"    # Configuration files folder, default is the same
                                         # with the folder containing this config file
   server_name: "MyJanusProxy"           # Public name of this Janus proxy
                                         # as it will appear in an info request
-  session_timeout: 0                   # How long (in seconds) we should wait before
+  session_timeout: 0                    # How long (in seconds) we should wait before
                                         # deciding a Janus session has timed out. A
                                         # session times out when no request is received
                                         # for session_timeout seconds (default=60s).
@@ -19,10 +19,15 @@ general:
                                         # To avoid timeouts, keep-alives can be used.  
   
 log:
-  log_to_stdout: false                  # Whether the Janus output should be written
+  log_to_stdout: true                   # Whether the Janus output should be written
                                         # to stdout or not (default=true)
-  log_to_file: "/path/to/janus.log"     # Whether to use a log file or not
-  debug_level: 4                        # Debug/logging level, valid values are 0-7
+  log_to_file: "/var/log/janus-proxy.log" # Whether to use a log file or not, if empty
+                                        # means not to log to a file
+  debug_level: 'DEBUG'                  # Debug/logging level, valid values are
+                                        # DEBUG/INFO/WARN/ERROR/FATAL, default is DEBUG
+
+  log_file_size: 104857600              # max size for one log file, default is 100M
+  log_file_rotate: 10                   # rotate number for log file, default is 10
 
 # Certificate and key to use for WSS and HTTPS (and passphrase if needed).
 certificates:
@@ -62,5 +67,7 @@ admin_api:
   http_listen: '127.0.0.1:8000'     # REST API server listen addr
   api_base_path: "/janus-proxy"     # Base path to bind to in the web server (plain HTTP only)
 
-
+# static configured backend Janus-gateway server besides the ones auto-registered by janus-sentinel
+# janus_server:
+#  -
 
