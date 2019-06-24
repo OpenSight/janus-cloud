@@ -173,7 +173,7 @@ class FrontendSessionManager(object):
                 if delta_time < TIMEOUT_CHECK_INTERVAL:
                     gevent.sleep(TIMEOUT_CHECK_INTERVAL - delta_time)
             else:
-                # session timeout check is disble, just None loop
+                # session timeout check is disable, just None loop
                 gevent.sleep(2)
 
     def _kick_timeout_sessions(self, session):

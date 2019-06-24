@@ -12,6 +12,8 @@ config_schema = Schema({
         Optional("configs_folder"): Default(StrVal(), default=''),
         Optional("server_name"): Default(StrVal(min_len=1, max_len=64), default='MyJanusProxy'),
         Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=60),
+        Optional("server_db"): Default(StrVal(), default='memory'),
+        Optional("server_select"): Default(StrVal(), default='rr'),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
     Optional("log"): Default({
@@ -28,7 +30,7 @@ config_schema = Schema({
         Optional("cert_pwd"): StrVal(),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
-    Optional("plugins"): Default(Or([StrRe('^\S+:\S+$')], None), default=[]),
+    Optional("plugins"): Default([StrRe('^\S+:\S+$')], default=[]),
     Optional("ws_transport"): Default({
         Optional("json"): Default(EnumVal(['indented', 'plain', 'compact']), default='indented'),
         Optional("pingpong_trigger"): Default(IntVal(min=0, max=3600), default=0),
@@ -46,6 +48,17 @@ config_schema = Schema({
         Optional("api_base_path"): Default(StrVal(), default='/janus-proxy'),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
+    Optional("janus_server"): Default([{
+        "name": StrVal(min_len=1, max_len=64),
+        "url": StrRe('^\S+$'),
+        Optional("status"): Default(IntVal(values=(0, 1)), default=0),
+        Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=10),
+        Optional("session_num"): Default(IntVal(min=0, max=10000), default=0),
+        Optional("handle_num"): Default(IntVal(min=0, max=100000), default=0),
+        Optional("location"): Default(StrVal(min_len=0, max_len=64), default=''),
+        Optional("isp"): Default(StrVal(min_len=0, max_len=64), default=''),
+        AutoDel(str): object  # for all other key we don't care
+    }], default=[]),
 })
 
 

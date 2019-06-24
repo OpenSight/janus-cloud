@@ -2,7 +2,7 @@
 
 # General configuration. for some basic configuration 
 general:
-  daemonize: false                      # Whether Janus-proxy should run as a daemon
+  daemonize: false                       # Whether Janus-proxy should run as a daemon
                                         # or not (default=run in foreground)
   # configs_folder: "/etc/janus-cloud"    # Configuration files folder, default is the same
                                         # with the folder containing this config file
@@ -17,7 +17,15 @@ general:
                                         # risk having orphaned sessions (sessions not
                                         # controlled by any transport and never freed).
                                         # To avoid timeouts, keep-alives can be used.  
-  
+  server_db: "memory"                   # the url of the database storing the backend Janus
+                                        # server info. Now only support smemory and redis type.
+                                        # which can support memory or redis type now.
+                                        # the url for memory db is "memory", the url for redis is
+                                        # prefix by "redis://" schema. default is memory
+  server_select: "rr"                   # select algorithm for backend Janus server, now support "rr" (round robin),
+                                        # "rand" (random), "lb" (load balance), and the thirdparty method.
+                                        # for the thirdparty method, it can be given in form "module_name:method_name".
+                                        # default is "rr".
 log:
   log_to_stdout: true                   # Whether the Janus output should be written
                                         # to stdout or not (default=true)
@@ -30,10 +38,10 @@ log:
   log_file_rotate: 10                   # rotate number for log file, default is 10
 
 # Certificate and key to use for WSS and HTTPS (and passphrase if needed).
-certificates:
+# certificates:
   #cert_pem: ".crt"
   #cert_key: "/opt/ssl2/server.key"
-  cert_pwd: "secretpassphrase"
+
 
 # You can choose which of the available plugins should be
 # enabled or not. list all the plugin's module path(e.g. januscloud.plugins.echotest)
@@ -68,6 +76,6 @@ admin_api:
   api_base_path: "/janus-proxy"     # Base path to bind to in the web server (plain HTTP only)
 
 # static configured backend Janus-gateway server besides the ones auto-registered by janus-sentinel
-# janus_server:
-#  -
+janus_server:
+  - {name: 'server1', url: 'ws://127.0.0.1:8188', status: 0, session_timeout=10}
 

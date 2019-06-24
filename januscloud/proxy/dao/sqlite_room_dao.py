@@ -14,9 +14,10 @@ class SqliteRoomDao(object):
         try:
             with conn:
                 pass
+        except Exception:
+            raise
         finally:
             self._conn_pool.put(conn)
-            raise
 
 
     def delete_by_id(self, room_id):

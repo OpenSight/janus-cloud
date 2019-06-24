@@ -32,6 +32,7 @@ def do_main(config):
     from januscloud.common.logger import set_root_logger
     from januscloud.transport.ws import WSServer
     import importlib
+    from januscloud.common.error import JanusCloudError,JANUS_ERROR_NOT_IMPLEMENTED
 
     set_root_logger(**(config['log']))
 
@@ -41,6 +42,14 @@ def do_main(config):
     try:
         cert_pem_file = config['certificates'].get('cert_pem')
         cert_key_file = config['certificates'].get('cert_key')
+
+        # load the dao
+        from januscloud.proxy.dao.mem_server_dao import MemServerDao
+        if config['general']['server_db'].startswith('memory'):
+            server_dao = MemServerDao()
+        else:
+            raise JanusCloudError('server_db url {} not support'.format(config['general']['server_db']),
+                                  JANUS_ERROR_NOT_IMPLEMENTED)
 
         # load the plugins
         config_path = config['general']['configs_folder']
@@ -57,6 +66,14 @@ def do_main(config):
         frontend_session_mgr = FrontendSessionManager(session_timeout=config['general']['session_timeout'])
         from januscloud.proxy.core.request import RequestHandler
         request_handler = RequestHandler(frontend_session_mgr=frontend_session_mgr, proxy_conf=config)
+        from januscloud.proxy.core.backend_server import BackendServerManager, set_server_mgr
+        backend_server_manager = BackendServerManager(config['general']['server_select'],
+                                                      config['janus_server'],
+                                                      server_dao)
+        set_server_mgr(backend_server_manager)
+
+
+
 
         # start admin rest api server
         pyramid_config = Configurator()

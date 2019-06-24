@@ -47,6 +47,7 @@ def set_root_logger(log_to_stdout, log_to_file, debug_level='DEBUG', log_file_si
         root.addHandler(rfh)
 
 
+
 def test_config(debug=False):
     import sys
     log = logging.getLogger()
