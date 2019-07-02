@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 JANUS_SERVER_STATUS_NORMAL = 0
-JANUS_SERVER_STATUS_UNAVAILABLE = 1
+JANUS_SERVER_STATUS_ABNORMAL = 1
 
 
 class BackendServer(object):
@@ -52,6 +52,7 @@ class BackendServerManager(object):
             self._select_algorithm = getattr(module, method_name)
 
         for server in static_server_list:
+
             self.update_server(expire=0, **server) # expired == 0 means static server without auto expired
 
         self._check_expired_greenlet = gevent.spawn(self._check_expired_routine)
@@ -61,6 +62,7 @@ class BackendServerManager(object):
         if server is None:
             server = BackendServer(name, url, status, **kwargs)
             log.info('Backend Server {} ({}) is added into proxy'.format(name, url))
+
             self._server_dao.add(server)
         else:
             server.url = url
@@ -82,7 +84,8 @@ class BackendServerManager(object):
         valid_servers = []
         now = time.time()
         for server in server_dao.get_list():
-            if server.status == JANUS_SERVER_STATUS_NORMAL and now - server.utime < server.expire:
+            if server.status == JANUS_SERVER_STATUS_NORMAL and \
+                    (server.expire == 0 or now - server.utime < server.expire):
                 valid_servers.append(server)
         return valid_servers
 
@@ -127,14 +130,6 @@ class BackendServerManager(object):
                     log.info('Backend Server {} ({}) expires'.format(server.name, server.url))
                     self._server_dao.del_by_name(server.name)
 
-
-_global_server_mgr = None
-
-def set_server_mgr(server_mgr):
-    _global_server_mgr = server_mgr
-
-def get_server_mgr():
-    return _global_server_mgr
 
 if __name__ == '__main__':
     pass

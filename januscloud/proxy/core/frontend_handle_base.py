@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import copy
 
 import logging
 import time
@@ -41,10 +42,22 @@ class FrontendHandleBase(object):
         if self._has_destroy:
             return
         self._has_destroy = True
+
+        # stop async message greenlet
         if not self._async_message_queue.full():
             self._async_message_queue.put(stop_message)
         self._async_message_greenlet = None
+
+        # send detach event
+        event = create_janus_msg('detached', self._session.session_id)
+        event['sender'] = self.handle_id
+        if self.opaque_id:
+            event['opaque_id'] = self.opaque_id
+        self._session.notify_event(event)
+
         log.info('handle {} is detach from plugin {}'.format(self.handle_id, self.plugin_package_name))
+
+
 
     def has_destroy(self):
         return self._has_destroy
@@ -72,24 +85,28 @@ class FrontendHandleBase(object):
             except Exception:
                 log.exception('Error when handle async message for handle {}'.format(self.handle_id))
 
+
     def _handle_async_message(self, transaction, body, jsep):
         """ need to override by subclass """
         raise JanusCloudError('async message handler not support\'message\'', JANUS_ERROR_PLUGIN_MESSAGE)
 
-    def _push_event(self, message, jsep=None, transaction=None):
+    def _push_plugin_event(self, data, jsep=None, transaction=None):
+        params = dict()
+        params['plugindata'] = {
+            'plugin': self.plugin_package_name,
+            'data': data
+        }
+        if jsep:
+            params['jsep'] = jsep
+        self._push_event('event', transaction, **params)
+
+    def _push_event(self, method, transaction=None, **kwargs):
         if self._has_destroy:
             return
-        event = create_janus_msg('event', self._session.session_id, transaction)
+        event = create_janus_msg(method, self._session.session_id, transaction, **kwargs)
         event['sender'] = self.handle_id
         if self.opaque_id:
             event['opaque_id'] = self.opaque_id
-        event['plugindata'] = {
-            'plugin': self.plugin_package_name,
-            'data': message
-        }
-        if jsep:
-            event['jsep'] = jsep
-
         self._session.notify_event(event)
 
 

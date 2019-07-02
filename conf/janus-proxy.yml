@@ -38,9 +38,9 @@ log:
   log_file_rotate: 10                   # rotate number for log file, default is 10
 
 # Certificate and key to use for WSS and HTTPS (and passphrase if needed).
-# certificates:
-  #cert_pem: ".crt"
-  #cert_key: "/opt/ssl2/server.key"
+certificates:
+  cert_pem: "/opt/ssl2/server.crt"
+  cert_key: "/opt/ssl2/server.key"
 
 
 # You can choose which of the available plugins should be
@@ -48,7 +48,7 @@ log:
 # below. 
 plugins:   
   - januscloud.proxy.plugin.dummytest:create
-#  - januscloud.proxy.plugin.echotest:create
+  - januscloud.proxy.plugin.echotest:create
 #  - januscloud.proxy.plugin.videoroom:create
 
 # Configuration for the websocket transport. 
@@ -64,7 +64,7 @@ ws_transport:
   ws_listen: '0.0.0.0:8288'         # WebSockets server listen addr
 
   wss: true                        # Whether to enable secure WebSockets
-  #wss_listen: '0.0.0.0:8289'       # WebSockets server secure listen addr, if enabled
+  wss_listen: '0.0.0.0:8289'       # WebSockets server secure listen addr, if enabled
 
   max_greenlet_num: 1024            # size of the greenlet pool for this transport, 0 means not limited
 
@@ -77,5 +77,5 @@ admin_api:
 
 # static configured backend Janus-gateway server besides the ones auto-registered by janus-sentinel
 janus_server:
-  - {name: 'server1', url: 'ws://127.0.0.1:8188', status: 0, session_timeout=10}
+  - {name: 'server1', url: 'ws://127.0.0.1:8188', status: 0, session_timeout: 60}
 

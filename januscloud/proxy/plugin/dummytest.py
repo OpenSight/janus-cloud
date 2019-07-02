@@ -43,11 +43,11 @@ class DummyHandle(FrontendHandleBase):
                  format(self.handle_id, candidate, candidates))
 
     def _handle_async_message(self, transaction, body, jsep):
-        self._push_event({'dummytest':'successful'}, jsep, transaction)
+        self._push_plugin_event({'dummytest':'successful'}, jsep, transaction)
 
 class DummyTestPlugin(PluginBase):
 
-    def init(self, config_path):
+    def init(self, config_path, backend_server_mgr):
         log.info('{} initialized!'.format(JANUS_DUMMYTEST_NAME))
 
     def get_version(self):

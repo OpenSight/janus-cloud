@@ -52,7 +52,7 @@ config_schema = Schema({
         "name": StrVal(min_len=1, max_len=64),
         "url": StrRe('^\S+$'),
         Optional("status"): Default(IntVal(values=(0, 1)), default=0),
-        Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=10),
+        Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=60),
         Optional("session_num"): Default(IntVal(min=0, max=10000), default=0),
         Optional("handle_num"): Default(IntVal(min=0, max=100000), default=0),
         Optional("location"): Default(StrVal(min_len=0, max_len=64), default=''),

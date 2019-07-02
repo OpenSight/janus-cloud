@@ -51,6 +51,17 @@ def do_main(config):
             raise JanusCloudError('server_db url {} not support'.format(config['general']['server_db']),
                                   JANUS_ERROR_NOT_IMPLEMENTED)
 
+
+        # load the core
+        from januscloud.proxy.core.frontend_session import FrontendSessionManager
+        frontend_session_mgr = FrontendSessionManager(session_timeout=config['general']['session_timeout'])
+        from januscloud.proxy.core.request import RequestHandler
+        request_handler = RequestHandler(frontend_session_mgr=frontend_session_mgr, proxy_conf=config)
+        from januscloud.proxy.core.backend_server import BackendServerManager
+        backend_server_manager = BackendServerManager(config['general']['server_select'],
+                                                      config['janus_server'],
+                                                      server_dao)
+
         # load the plugins
         config_path = config['general']['configs_folder']
         from januscloud.proxy.core.plugin_base import register_plugin
@@ -58,21 +69,8 @@ def do_main(config):
             module_name, sep, method_name = plugin_str.partition(':')
             module = importlib.import_module(module_name)
             plugin = getattr(module, method_name)()
-            plugin.init(config_path)
+            plugin.init(config_path, backend_server_manager)
             register_plugin(plugin.get_package(), plugin)
-
-        # load the core
-        from januscloud.proxy.core.frontend_session import FrontendSessionManager
-        frontend_session_mgr = FrontendSessionManager(session_timeout=config['general']['session_timeout'])
-        from januscloud.proxy.core.request import RequestHandler
-        request_handler = RequestHandler(frontend_session_mgr=frontend_session_mgr, proxy_conf=config)
-        from januscloud.proxy.core.backend_server import BackendServerManager, set_server_mgr
-        backend_server_manager = BackendServerManager(config['general']['server_select'],
-                                                      config['janus_server'],
-                                                      server_dao)
-        set_server_mgr(backend_server_manager)
-
-
 
 
         # start admin rest api server

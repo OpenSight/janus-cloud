@@ -25,6 +25,7 @@ class MemServerDao(object):
             raise JanusCloudError('server {} already in repo'.format(server.name), JANUS_ERROR_CONFLICT)
         self._servers_by_name[server.name] = copy.copy(server)
 
+
     def update(self, server):
         org_server = self._servers_by_name.get(server.name)
         if not org_server:

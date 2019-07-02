@@ -88,7 +88,7 @@ class FrontendSession(object):
         return handle
 
     def detach_handle(self, handle_id):
-        handle = self._handles.get(handle_id)
+        handle = self._handles.pop(handle_id, None)
         if handle is None:
             return
         handle.detach()

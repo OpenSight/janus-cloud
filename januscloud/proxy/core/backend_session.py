@@ -63,7 +63,7 @@ class BackendSession(object):
         self._handles = {}
         self._auto_destroy = int(auto_destroy)
         self._auto_destroy_greenlet = None
-        self._keepalive_interval = keepalive_interval
+        self._keepalive_interval = keepalive_interval if keepalive_interval > 0 else 10
         self._keepalive_greenlet = None
         _sessions[url] = self
 
@@ -173,22 +173,10 @@ class BackendSession(object):
             self._ws_client = None
 
     def _close_cbk(self):
-        if self.state == BACKEND_SESSION_STATE_DESTROYED:
-            return
-        self.state = BACKEND_SESSION_STATE_DESTROYED
-        if _sessions.get(self.url) == self:
-            _sessions.pop(self.url)
+        log.info('Backend session {} is closed by under network'.format(self.session_id))
+        self._ws_client = None
+        self.destroy()
 
-        if self._auto_destroy_greenlet:
-            gevent.kill(self._auto_destroy_greenlet)
-            self._auto_destroy_greenlet = None
-
-        for handle in self._handles.values():
-            handle.on_close()
-        self._handles.clear()
-
-        if self._ws_client:
-            self._ws_client = None
 
     def _auto_destroy_routine(self):
         log.info('Backend session {} is auto destroyed'.format(self.session_id))
@@ -196,19 +184,28 @@ class BackendSession(object):
         self.destroy()
 
     def _recv_msg_cbk(self, msg):
-
-        if 'transaction' in msg:
-            transaction = self._transactions.get(msg['transaction'])
-            if transaction:
-                transaction.response = msg
-                return
-        elif 'sender' in msg:
-            handle = self._handles[msg['sender']]
-            if handle:
-                handle.on_async_event(msg)
-                return
-
-        log.warn('Receive a invalid message {} on session {} for server {}'.format(msg, self.session_id, self.url))
+        try:
+            if 'transaction' in msg:
+                transaction = self._transactions.get(msg['transaction'])
+                if transaction:
+                    transaction.response = msg
+            elif msg['janus'] == 'timeout':
+                log.debug('Receive session timeout from Janus server: {}'.format(self.url))
+                self.destroy()
+            elif msg['janus'] == 'detached':
+                log.debug('Receive async event {} from Janus server: {}'.format(msg, self.url))
+                handle = self._handles.pop(msg['sender'], None)
+                if handle:
+                    handle.on_close()
+            elif 'sender' in msg:
+                log.debug('Receive async event {} from Janus server: {}'.format(msg, self.url))
+                handle = self._handles.get(msg['sender'], None)
+                if handle:
+                    handle.on_async_event(msg)
+            else:
+                log.warn('Receive a invalid message {} on session {} for server {}'.format(msg, self.session_id, self.url))
+        except Exception:
+            log.exception('Received a malformat msg {}'.format(msg))
 
     def _genrate_new_tid(self):
         tid = str(random_uint64())
