@@ -173,6 +173,8 @@ class BackendSession(object):
             self._ws_client = None
 
     def _close_cbk(self):
+        if self.state == BACKEND_SESSION_STATE_DESTROYED:
+            return
         log.info('Backend session {} is closed by under network'.format(self.session_id))
         self._ws_client = None
         self.destroy()

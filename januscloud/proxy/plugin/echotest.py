@@ -135,7 +135,7 @@ class EchoTestHandle(FrontendHandleBase):
 class EchoTestPlugin(PluginBase):
     """ This base class for plugin """
 
-    def init(self, config_path, backend_server_mgr):
+    def init(self, config_path, backend_server_mgr, pyramid_config):
         global _backend_server_mgr
         _backend_server_mgr = backend_server_mgr
         log.info('{} initialized!'.format(JANUS_ECHOTEST_NAME))

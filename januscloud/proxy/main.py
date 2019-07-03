@@ -62,6 +62,14 @@ def do_main(config):
                                                       config['janus_server'],
                                                       server_dao)
 
+        # rest api config
+        pyramid_config = Configurator()
+        pyramid_config.add_renderer(None, JSON(indent=4, check_circular=True, cls=CustomJSONEncoder))
+        pyramid_config.include('januscloud.proxy.rest', route_prefix=config['admin_api']['api_base_path'])
+        # TODO register service to pyramid registry
+        # pyramid_config.registry.das_mngr = das_mngr
+
+
         # load the plugins
         config_path = config['general']['configs_folder']
         from januscloud.proxy.core.plugin_base import register_plugin
@@ -69,16 +77,12 @@ def do_main(config):
             module_name, sep, method_name = plugin_str.partition(':')
             module = importlib.import_module(module_name)
             plugin = getattr(module, method_name)()
-            plugin.init(config_path, backend_server_manager)
+            plugin.init(config_path, backend_server_manager, pyramid_config)
             register_plugin(plugin.get_package(), plugin)
 
 
         # start admin rest api server
-        pyramid_config = Configurator()
-        pyramid_config.add_renderer(None, JSON(indent=4, check_circular=True, cls=CustomJSONEncoder))
-        pyramid_config.include('januscloud.proxy.rest', route_prefix=config['admin_api']['api_base_path'])
-        # TODO register service to pyramid registry
-        # pyramid_config.registry.das_mngr = das_mngr
+
 
         # set up all server
         server_list = []

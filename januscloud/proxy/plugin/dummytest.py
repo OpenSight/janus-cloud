@@ -47,7 +47,7 @@ class DummyHandle(FrontendHandleBase):
 
 class DummyTestPlugin(PluginBase):
 
-    def init(self, config_path, backend_server_mgr):
+    def init(self, config_path, backend_server_mgr, pyramid_config):
         log.info('{} initialized!'.format(JANUS_DUMMYTEST_NAME))
 
     def get_version(self):
