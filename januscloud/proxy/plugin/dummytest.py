@@ -23,8 +23,8 @@ JANUS_DUMMYTEST_PACKAGE = 'janus.plugin.dummytest'
 
 
 class DummyHandle(FrontendHandleBase):
-    def __init__(self, handle_id, session, plugin_package_name, opaque_id=None, *args, **kwargs):
-        super().__init__(handle_id, session, plugin_package_name, opaque_id, *args, **kwargs)
+    def __init__(self, handle_id, session, plugin, opaque_id=None, *args, **kwargs):
+        super().__init__(handle_id, session, plugin, opaque_id, *args, **kwargs)
 
     def handle_hangup(self):
         log.info('handle_hangup for dummy Handle {}'.format(self.handle_id))
@@ -47,7 +47,8 @@ class DummyHandle(FrontendHandleBase):
 
 class DummyTestPlugin(PluginBase):
 
-    def init(self, config_path, backend_server_mgr, pyramid_config):
+    def __init__(self, proxy_config, backend_server_mgr, pyramid_config):
+        super().__init__(proxy_config, backend_server_mgr, pyramid_config)
         log.info('{} initialized!'.format(JANUS_DUMMYTEST_NAME))
 
     def get_version(self):
@@ -71,9 +72,6 @@ class DummyTestPlugin(PluginBase):
     def create_handle(self, handle_id, session, opaque_id=None, *args, **kwargs):
         return DummyHandle(handle_id, session, self, opaque_id, *args, **kwargs)
 
-
-def create():
-    return DummyTestPlugin()
 
 
 

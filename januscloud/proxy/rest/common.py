@@ -4,6 +4,7 @@ import sys
 import traceback
 import inspect
 import copy
+import pyramid.exceptions
 from pyramid.view import view_config
 from pyramid.events import subscriber, NewResponse
 from januscloud.common.schema import SchemaError as ValidationFailure
@@ -84,7 +85,7 @@ def failed_validation(exc, request):
 @view_config(context=JanusCloudError)
 def ivr_error_view(exc, request):
     response = request.response
-    response.status_int = exc.http_status_code
+    response.status_int = exc.code
     typ, dummy, tb = sys.exc_info()
     tb_list = traceback.format_list(traceback.extract_tb(tb)[-10:])
     log.error('Error handling request\n{0}\n{1}'.format(str(exc), ' '.join(tb_list)))
@@ -100,6 +101,24 @@ def error_view(exc, request):
     log.error('Error handling request\n{0}\n{1}'.format(str(exc), ' '.join(tb_list)))
     return {'info': str(exc), 'exception': str(typ), 'traceback': tb_list}
 
+@view_config(context=pyramid.exceptions.NotFound)
+def not_found_view(exc, request):
+    response = request.response
+    response.status_int = exc.status_code
+    type, dummy, tb = sys.exc_info()
+    return {'info': 'Resource {0} not found or method {1} not supported'.format(request.path, request.method),
+            'exception': str(type),
+            'traceback': []}
+
+
+@view_config(context=pyramid.exceptions.Forbidden)
+def forbidden_view(exc, request):
+    response = request.response
+    response.status_int = exc.status_code
+    type, dummy, tb = sys.exc_info()
+    return {'info': 'Resource {0} for method {1} is Forbidden'.format(request.path, request.method),
+            'exception': str(type),
+            'traceback': []}
 
 @subscriber(NewResponse)
 def add_response_header(event):

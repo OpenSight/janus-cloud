@@ -10,7 +10,7 @@ config_schema = Schema({
     Optional("general"): Default({
         Optional("daemonize"): Default(BoolVal(), default=False),
         Optional("configs_folder"): Default(StrVal(), default=''),
-        Optional("server_name"): Default(StrVal(min_len=1, max_len=64), default='MyJanusProxy'),
+        Optional("server_name"): Default(StrVal(min_len=1, max_len=64), default='JanusProxy'),
         Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=60),
         Optional("server_db"): Default(StrVal(), default='memory'),
         Optional("server_select"): Default(StrVal(), default='rr'),

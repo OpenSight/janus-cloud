@@ -25,15 +25,12 @@ JANUS_ECHOTEST_NAME = 'JANUS EchoTest plugin'
 JANUS_ECHOTEST_AUTHOR = 'opensight.cn'
 JANUS_ECHOTEST_PACKAGE = 'janus.plugin.echotest'
 
-_backend_server_mgr = None
-
-
 
 class EchoTestHandle(FrontendHandleBase):
-    def __init__(self, handle_id, session, plugin_package_name, opaque_id=None, *args, **kwargs):
-        super().__init__(handle_id, session, plugin_package_name, opaque_id, *args, **kwargs)
+    def __init__(self, handle_id, session, plugin, opaque_id=None, *args, **kwargs):
+        super().__init__(handle_id, session, plugin, opaque_id, *args, **kwargs)
 
-        server = _backend_server_mgr.choose_server(session.ts)
+        server = plugin.backend_server_mgr.choose_server(session.ts)
         if server is None:
             raise JanusCloudError('No backend server', JANUS_ERROR_BAD_GATEWAY)
 
@@ -73,28 +70,15 @@ class EchoTestHandle(FrontendHandleBase):
             raise JanusCloudError('backend handle invalid', JANUS_ERROR_BAD_GATEWAY)
         log.debug('handle_trickle for echotest handle {}.candidate:{} candidates:{}'.
                  format(self.handle_id, candidate, candidates))
-        params = {}
-        if candidate:
-            params['candidate'] = candidate
-        if candidates:
-            params['candidates'] = candidates
-        self.backend_handle.send_trickle(params)
+        self.backend_handle.send_trickle(candidate=candidate, candidates=candidates)
 
     def _handle_async_message(self, transaction, body, jsep):
         try:
             if self.backend_handle is None:
                 raise JanusCloudError('backend handle invalid', JANUS_ERROR_BAD_GATEWAY)
 
-            params = {}
-            if body:
-                params['body'] = body
-            if jsep:
-                params['jsep'] = jsep
-
-            response = self.backend_handle.send_message(params)
-            data = response['plugindata']['data']
-            jsep = response.get('jsep')
-            self._push_plugin_event(data, jsep, transaction)
+            data, reply_jsep = self.backend_handle.send_message(body=body, jsep=jsep)
+            self._push_plugin_event(data, reply_jsep, transaction)
 
         except JanusCloudError as e:
             log.exception('Fail to send message to backend handle {}'.format(self.backend_handle.handle_id))
@@ -135,9 +119,10 @@ class EchoTestHandle(FrontendHandleBase):
 class EchoTestPlugin(PluginBase):
     """ This base class for plugin """
 
-    def init(self, config_path, backend_server_mgr, pyramid_config):
-        global _backend_server_mgr
-        _backend_server_mgr = backend_server_mgr
+
+    def __init__(self, proxy_config, backend_server_mgr, pyramid_config):
+        super().__init__(proxy_config, backend_server_mgr, pyramid_config)
+        self.backend_server_mgr = backend_server_mgr
         log.info('{} initialized!'.format(JANUS_ECHOTEST_NAME))
 
     def get_version(self):
@@ -161,9 +146,6 @@ class EchoTestPlugin(PluginBase):
     def create_handle(self, handle_id, session, opaque_id=None, *args, **kwargs):
         return EchoTestHandle(handle_id, session, self, opaque_id, *args, **kwargs)
 
-
-def create():
-    return EchoTestPlugin()
 
 if __name__ == '__main__':
     pass

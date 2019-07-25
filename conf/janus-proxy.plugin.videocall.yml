@@ -1,0 +1,9 @@
+
+
+# General configuration for janus-proxy videocall plugin 
+general:
+
+  user_db: "memory"                     # URL of the database to store the user info, 
+                                        # only support "memory" type by now
+
+

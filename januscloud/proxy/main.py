@@ -71,13 +71,12 @@ def do_main(config):
 
 
         # load the plugins
-        config_path = config['general']['configs_folder']
         from januscloud.proxy.core.plugin_base import register_plugin
         for plugin_str in config['plugins']:
-            module_name, sep, method_name = plugin_str.partition(':')
+            module_name, sep, factory_name = plugin_str.partition(':')
             module = importlib.import_module(module_name)
-            plugin = getattr(module, method_name)()
-            plugin.init(config_path, backend_server_manager, pyramid_config)
+            plugin_factory = getattr(module, factory_name)
+            plugin = plugin_factory(config, backend_server_manager, pyramid_config)
             register_plugin(plugin.get_package(), plugin)
 
 

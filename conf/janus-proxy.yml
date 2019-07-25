@@ -6,8 +6,8 @@ general:
                                         # or not (default=run in foreground)
   # configs_folder: "/etc/janus-cloud"    # Configuration files folder, default is the same
                                         # with the folder containing this config file
-  server_name: "MyJanusProxy"           # Public name of this Janus proxy
-                                        # as it will appear in an info request
+  server_name: "127.0.0.1"              # IP address or hostname of this Janus proxy,
+                                        # it will appear in an info request, and is used for cluster addressing
   session_timeout: 0                    # How long (in seconds) we should wait before
                                         # deciding a Janus session has timed out. A
                                         # session times out when no request is received
@@ -18,8 +18,7 @@ general:
                                         # controlled by any transport and never freed).
                                         # To avoid timeouts, keep-alives can be used.  
   server_db: "memory"                   # the url of the database storing the backend Janus
-                                        # server info. Now only support smemory and redis type.
-                                        # which can support memory or redis type now.
+                                        # server info. Now only support memory type.
                                         # the url for memory db is "memory", the url for redis is
                                         # prefix by "redis://" schema. default is memory
   server_select: "rr"                   # select algorithm for backend Janus server, now support "rr" (round robin),
@@ -44,12 +43,12 @@ certificates:
 
 
 # You can choose which of the available plugins should be
-# enabled or not. list all the plugin's module path(e.g. januscloud.plugins.echotest)
-# below. 
+# enabled or not. the item in this list is with the format below,
+# plugin_module_path(e.g. januscloud.plugins.echotest):plugin_fatory_name
 plugins:   
-  - januscloud.proxy.plugin.dummytest:create
-  - januscloud.proxy.plugin.echotest:create
-#  - januscloud.proxy.plugin.videoroom:create
+  - januscloud.proxy.plugin.dummytest:DummyTestPlugin
+  - januscloud.proxy.plugin.echotest:EchoTestPlugin
+  - januscloud.proxy.plugin.videocall:VideoCallPlugin
 
 # Configuration for the websocket transport. 
 # Websocket transport module outputs the Janus api on websocket protocol just as Janus server
@@ -72,7 +71,7 @@ ws_transport:
 admin_api:
   json: "indented"                  # Whether the JSON messages should be indented (default),
   # plain (no indentation) or compact (no indentation and no spaces)
-  http_listen: '127.0.0.1:8000'     # REST API server listen addr
+  http_listen: '0.0.0.0:8000'       # REST API server listen addr
   api_base_path: "/janus-proxy"     # Base path to bind to in the web server (plain HTTP only)
 
 # static configured backend Janus-gateway server besides the ones auto-registered by janus-sentinel

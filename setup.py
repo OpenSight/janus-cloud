@@ -10,6 +10,7 @@ requires = [
     'ws4py==0.5.1',
     'PyYAML==5.1',
     'pyramid==1.10.4',
+    'requests>=2.18.4'
 ]
 
 

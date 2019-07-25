@@ -16,7 +16,7 @@ _plugins = {}
 class PluginBase(object):
     """ This base class for plugin """
 
-    def init(self, config_path, backend_server_mgr, pyramid_config):
+    def __init__(self, proxy_config, backend_server_mgr, pyramid_config):
         pass
 
     def get_version(self):

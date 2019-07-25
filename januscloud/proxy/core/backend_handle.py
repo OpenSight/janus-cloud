@@ -3,7 +3,7 @@
 import logging
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg, get_monotonic_time, random_uint64
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_INVALID_ELEMENT_TYPE, \
-    JANUS_ERROR_PLUGIN_DETACH, JANUS_ERROR_BAD_GATEWAY
+    JANUS_ERROR_PLUGIN_DETACH, JANUS_ERROR_BAD_GATEWAY, JANUS_ERROR_MISSING_MANDATORY_ELEMENT, JANUS_ERROR_INVALID_JSON
 from gevent.queue import Queue
 import gevent
 
@@ -67,15 +67,22 @@ class BackendHandle(object):
 
             self._session = None
 
-    def send_message(self, params):
+    def send_message(self, body, jsep=None):
         if self._has_detach:
             raise JanusCloudError('backend handle {} has been destroyed'.format(self.handle_id),
                                   JANUS_ERROR_PLUGIN_DETACH)
 
+        params = dict()
+        params['body'] = body
+        if jsep:
+            params['jsep'] = jsep
+
         message = create_janus_msg('message', handle_id=self.handle_id, **params)
         response = self._session.send_request(message)
         if response['janus'] == 'event' or response['janus'] == 'success':
-            return response
+            data = response['plugindata']['data']
+            reply_jsep = response.get('jsep')
+            return data, reply_jsep
         elif response['janus'] == 'error':
             raise JanusCloudError(response['error']['reason'], response['error']['code'])
         else:
@@ -83,10 +90,21 @@ class BackendHandle(object):
                 'unknown backend response {}'.format(response),
                 JANUS_ERROR_BAD_GATEWAY)
 
-    def send_trickle(self, params):
+    def send_trickle(self, candidate=None, candidates=None):
         if self._has_detach:
             raise JanusCloudError('backend handle {} has been destroyed'.format(self.handle_id),
                                   JANUS_ERROR_PLUGIN_DETACH)
+        if candidate is None and candidates is None:
+            raise JanusCloudError('Missing mandatory element (candidate|candidates)',
+                                  JANUS_ERROR_MISSING_MANDATORY_ELEMENT)
+        if candidate and candidates:
+            raise JanusCloudError('Can\'t have both candidate and candidates',
+                                  JANUS_ERROR_INVALID_JSON)
+        params = {}
+        if candidate:
+            params['candidate'] = candidate
+        if candidates:
+            params['candidates'] = candidates
         trickle_msg = create_janus_msg('trickle', handle_id=self.handle_id, **params)
         response = self._session.send_request(trickle_msg, ignore_ack=False)
         if response['janus'] == 'ack':
