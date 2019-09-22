@@ -1,0 +1,9 @@
+
+
+# General configuration for janus-proxy p2pcall plugin 
+general:
+
+  user_db: "memory"                     # URL of the database to store the user info, 
+                                        # only support "memory" type by now
+
+
