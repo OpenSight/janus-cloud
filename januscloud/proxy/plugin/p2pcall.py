@@ -21,21 +21,19 @@ from januscloud.proxy.rest.common import post_view, get_params_from_request
 from pyramid.response import Response
 import requests
 
+
 log = logging.getLogger(__name__)
 
-BACKEND_SESSION_AUTO_DESTROY_TIME = 10 # auto destroy the backend session after 10s if no handle for it
-
-
-JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN = 476
-JANUS_VIDEOCALL_ERROR_REGISTER_FIRST = 473
-JANUS_VIDEOCALL_ERROR_ALREADY_IN_CALL = 480
-JANUS_VIDEOCALL_ERROR_INVALID_ELEMENT = 474
-JANUS_VIDEOCALL_ERROR_INVALID_REQUEST = 472
-JANUS_VIDEOCALL_ERROR_ALREADY_REGISTERED = 477
-JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME = 478
-JANUS_VIDEOCALL_ERROR_USE_ECHO_TEST = 479
-JANUS_VIDEOCALL_ERROR_NO_CALL = 481
-JANUS_VIDEOCALL_ERROR_MISSING_SDP = 482
+JANUS_P2PCALL_ERROR_USERNAME_TAKEN = 476
+JANUS_P2PCALL_ERROR_REGISTER_FIRST = 473
+JANUS_P2PCALL_ERROR_ALREADY_IN_CALL = 480
+JANUS_P2PCALL_ERROR_INVALID_ELEMENT = 474
+JANUS_P2PCALL_ERROR_INVALID_REQUEST = 472
+JANUS_P2PCALL_ERROR_ALREADY_REGISTERED = 477
+JANUS_P2PCALL_ERROR_NO_SUCH_USERNAME = 478
+JANUS_P2PCALL_ERROR_USE_ECHO_TEST = 479
+JANUS_P2PCALL_ERROR_NO_CALL = 481
+JANUS_P2PCALL_ERROR_MISSING_SDP = 482
 
 JANUS_P2PCALL_VERSION = 6
 JANUS_P2PCALL_VERSION_STRING = '0.0.6'
@@ -45,32 +43,15 @@ JANUS_P2PCALL_NAME = 'JANUS P2PCall plugin'
 JANUS_P2PCALL_AUTHOR = 'opensight.cn'
 JANUS_P2PCALL_PACKAGE = 'janus.plugin.p2pcall'
 
-
 JANUS_P2PCALL_API_BASE_PATH = '/plugins/p2pcall'
 
 
-INCOMMING_CALL_TIMEOUT = 10
-
 username_schema = Schema({
-         'username': StrRe('^\w{1,128}$'),
-        DoNotCare(str): object  # for all other key we don't care
- })
-
-set_schema = Schema({
-    Optional('audio'): BoolVal(),
-    Optional('video'): BoolVal(),
-    Optional('bitrate'): IntVal(min=1),
-    Optional('record'): BoolVal(),
-    Optional('restart'): BoolVal(),
-    Optional('filename'): StrVal(),
+    'username': StrRe('^\w{1,128}$'),
     DoNotCare(str): object  # for all other key we don't care
- })
-
-post_p2pcall_user_schema = Schema({
-    'from_user': StrRe('^\w{1, 128}$'),
-    'async_event': dict,
-    AutoDel(str): object  # for all other key we auto delete
 })
+
+
 
 class P2PCallUser(object):
 
@@ -84,229 +65,219 @@ class P2PCallUser(object):
         self.ctime = time.time()
 
     def __str__(self):
-        return 'P2P Call User"{0}"({1})'.format(self.name, self.url)
+        return 'P2P Call User"{0}"(url:{1}, handle:{2})'.format(self.username, self.api_url, self.handle)
+
 
 class P2PCallHandle(FrontendHandleBase):
+
     def __init__(self, handle_id, session, plugin, opaque_id=None, *args, **kwargs):
         super().__init__(handle_id, session, plugin, opaque_id, *args, **kwargs)
 
         self.p2pcall_user = None
-        #self.backend_handle = None
-        #self._backend_server_url = None
-        #self._backend_keepalive_interval = 0
-        #self._pending_candidates = list()
-        #self._pending_set_body = None
-        #self._auto_disconnect_greenlet = None
-
+        self._pending_candidates = list()
+        self._trickle_holding = False
 
     def detach(self):
         if self._has_destroy:
             return
         super().detach()
 
-
         if self.p2pcall_user:
-            self._plugin.user_dao.del_by_username(self.videocall_user.username)
-            self.videocall_user = None
-
+            self._plugin.user_dao.del_by_username(self.p2pcall_user.username)
+            self.p2pcall_user.handle = None
+            self.p2pcall_user = None
 
     def handle_hangup(self):
         log.debug('handle_hangup for p2pcall Handle {}'.format(self.handle_id))
-        #TODO send a hangup event to the peer
+        if self.p2pcall_user and self.p2pcall_user.incall:
+            hangup_msg = create_janus_msg('hangup', reason='Peer Hangup')
+            self._send_aync_event(self.p2pcall_user.peer_name, hangup_msg)
 
     def handle_message(self, transaction, body, jsep=None):
         log.debug('handle_message for p2pcall handle {}. transaction:{} body:{} jsep:{}'.
                  format(self.handle_id, transaction, body, jsep))
-
         self._enqueue_async_message(transaction, body, jsep)
         return JANUS_PLUGIN_OK_WAIT, None
 
-
     def handle_trickle(self, candidate=None, candidates=None):
-        log.debug('handle_trickle for videocall handle {}.candidate:{} candidates:{}'.
+        log.debug('handle_trickle for p2pcall handle {}.candidate:{} candidates:{}'.
                  format(self.handle_id, candidate, candidates))
-        #TODO send a trickle event to the peer
-        '''
-        if self.videocall_user is None or self.videocall_user.incall == False:
+
+        if candidate:
             if candidates:
-                self._pending_candidates.extend(candidates)
-            if candidate:
-                self._pending_candidates.append(candidate)
-        else:
-            while self.backend_handle is None and self.videocall_user.incall == True:
-                # backend handle is building
-                gevent.sleep(0.1)
-            if self.backend_handle:
-                self.backend_handle.send_trickle(candidate=candidate, candidates=candidates)
+                candidates.append(candidate)
             else:
-                if candidates:
-                    self._pending_candidates.extend(candidates)
-                if candidate:
-                    self._pending_candidates.append(candidate)
-        '''
+                candidates = [candidate]
 
-    def handle_incoming_call(self, caller_username, backend_server_url, backend_keepalive_interval):
-        if self.videocall_user is None:
-            raise JanusCloudError('Register a username first', JANUS_VIDEOCALL_ERROR_REGISTER_FIRST)
-        if self.videocall_user.incall:
-            raise JanusCloudError('User {} busy'.format(self.videocall_user.username), JANUS_VIDEOCALL_ERROR_ALREADY_IN_CALL)
-        self.videocall_user.incall = True
-        self.videocall_user.peer_name = caller_username
-        self.videocall_user.utime = time.time()
-        try:
-            self._connect_backend(backend_server_url, backend_keepalive_interval)
-            self._plugin.user_dao.update(self.videocall_user)
-        except Exception:
-            self._disconnect_backend()
-            self.videocall_user.peer_name = ''
-            self.videocall_user.incall = False
-            raise
-
-        # if incoming_call event cannot be received in INCOMMING_CALL_TIMEOUT(10) seconds, auto disconnect the backend server
-        if self._auto_disconnect_greenlet is None:
-            self._auto_disconnect_greenlet = gevent.spawn_later(INCOMMING_CALL_TIMEOUT, self._auto_disconnect_routine)
+        if self.p2pcall_user is None or self.p2pcall_user.incall is False or self._trickle_holding:
+            self._pending_candidates.extend(candidates)
+        else:
+            trickle_msg = create_janus_msg('trickle', candidates=candidates)
+            self._send_aync_event(self.p2pcall_user.peer_name, trickle_msg)
 
     def _handle_async_message(self, transaction, body, jsep):
         try:
             result = None
             request = body.get('request')
             if request is None:
-                raise JanusCloudError('Request {}  format invalid'.format(body), JANUS_VIDEOCALL_ERROR_INVALID_ELEMENT)
+                raise JanusCloudError('Request {}  format invalid'.format(body), JANUS_P2PCALL_ERROR_INVALID_ELEMENT)
             if request == 'list':
                 username_list = self._plugin.user_dao.get_username_list()
                 result = {
                     'list': username_list
                 }
             elif request == 'register':
-                if self.videocall_user:
-                    raise JanusCloudError('Already registered ({})'.format(self.videocall_user.username),
-                                          JANUS_VIDEOCALL_ERROR_ALREADY_REGISTERED)
+                if self.p2pcall_user:
+                    raise JanusCloudError('Already registered ({})'.format(self.p2pcall_user.username),
+                                          JANUS_P2PCALL_ERROR_ALREADY_REGISTERED)
                 body = username_schema.validate(body)
                 username = body['username']
-                exist_user = self._plugin.user_dao.get_by_username(username)
-                if exist_user:
-                    log.error('Username \'{}\' already taken'.format(username))
-                    raise JanusCloudError('Username \'{}\' already taken'.format(username),
-                                          JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN)
                 # valid, register this new user
                 api_url = self._plugin.api_base_url + '/' + username
-                new_videocall_user = VideoCallUser(username, handle=self, api_url=api_url)
-                self._plugin.user_dao.add(new_videocall_user)
-                self.videocall_user = new_videocall_user
+                new_p2pcall_user = P2PCallUser(username, handle=self, api_url=api_url)
+                self._plugin.user_dao.add(new_p2pcall_user)
+                self.p2pcall_user = new_p2pcall_user
                 result = {
                     'event': 'registered',
                     'username': username
                 }
             elif request == 'call':
-                if self.videocall_user is None:
-                    raise JanusCloudError('Register a username first', JANUS_VIDEOCALL_ERROR_REGISTER_FIRST)
-                if self.videocall_user.incall:
-                    raise JanusCloudError('Already in a call', JANUS_VIDEOCALL_ERROR_ALREADY_IN_CALL)
+                if self.p2pcall_user is None:
+                    raise JanusCloudError('Register a username first', JANUS_P2PCALL_ERROR_REGISTER_FIRST)
+                if self.p2pcall_user.incall:
+                    raise JanusCloudError('Already in a call', JANUS_P2PCALL_ERROR_ALREADY_IN_CALL)
 
                 body = username_schema.validate(body)
                 username = body['username']
-                if username == self.videocall_user.username:
+                if username == self.p2pcall_user.username:
                     raise JanusCloudError('You can\'t call yourself... use the EchoTest for that',
-                                          JANUS_VIDEOCALL_ERROR_USE_ECHO_TEST)
+                                          JANUS_P2PCALL_ERROR_USE_ECHO_TEST)
                 peer = self._plugin.user_dao.get_by_username(username)
                 if peer is None:
                     raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(username),
-                                          JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME)
+                                          JANUS_P2PCALL_ERROR_NO_SUCH_USERNAME)
                 if jsep is None:
-                    raise JanusCloudError('Missing SDP', JANUS_VIDEOCALL_ERROR_MISSING_SDP)
-
-                server = self._plugin.backend_server_mgr.choose_server(self._session.ts)
-                if server is None:
-                    raise JanusCloudError('No backend server', JANUS_ERROR_BAD_GATEWAY)
+                    raise JanusCloudError('Missing SDP', JANUS_P2PCALL_ERROR_MISSING_SDP)
 
                 if peer.incall:
                     log.debug('{} is busy'.format(username))
                     result = {
                         'event': 'hangup',
-                        'username': self.videocall_user.username,
+                        'username': self.p2pcall_user.username,
                         'reason': 'User busy'
                     }
                 else:
                     # start the calling process
-
                     try:
-                        self.videocall_user.peer_name = username
-                        self.videocall_user.incall = True
-                        self.videocall_user.utime = time.time()
-                        self._connect_backend(server.url, server.session_timeout / 3)
-                        self._plugin.call_peer(username, self.videocall_user.username,
-                                               server.url, server.session_timeout / 3)
-                        # send call request to backend server
-                        result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
-                        self._plugin.user_dao.update(self.videocall_user)
+                        self.p2pcall_user.peer_name = username
+                        self.p2pcall_user.incall = True
+                        self.p2pcall_user.utime = time.time()
+                        self._trickle_holding = True    # buffer the trickle candidates util
+                                                        # peer receiving incoming call event
+                        # update the user dao
+                        self._plugin.user_dao.update(self.p2pcall_user)
+
+                        # send the imcomingcall event to the peer
+                        call = {
+                            'videocall': 'event',
+                            'result': {
+                                'event': 'incomingcall',
+                                'username': self.p2pcall_user.username
+                            }
+                        }
+                        self._send_plugin_event(username, call, jsep)
+
+                        self._trickle_holding = False
+                        # send the buffer candidates
+                        if len(self._pending_candidates) > 0:
+                            candidates = self._pending_candidates
+                            self._pending_candidates.clear()
+                            trickle_msg = create_janus_msg('trickle', candidates=candidates)
+                            self._send_aync_event(self.p2pcall_user.peer_name, trickle_msg)
+
+                        result = {
+                            'event': 'calling'
+                        }
                     except Exception:
-                        backend_handle = self.backend_handle
-                        self.backend_handle = None
-                        self.videocall_user.peer_name = ''
-                        self.videocall_user.incall = False
-                        if backend_handle:
-                            backend_handle.detach()
+                        self.p2pcall_user.peer_name = ''
+                        self.p2pcall_user.incall = False
+                        self._trickle_holding = False
+                        # update the user dao
+                        self._plugin.user_dao.update(self.p2pcall_user)
                         raise
 
-
             elif request == 'accept':
-                if self.videocall_user is None or self.videocall_user.incall == False \
-                        or self.videocall_user.peer_name == '' or self.backend_handle is None:
-                    raise JanusCloudError('No incoming call to accept', JANUS_VIDEOCALL_ERROR_NO_CALL)
+                if self.p2pcall_user is None or self.p2pcall_user.incall is False \
+                        or self.p2pcall_user.peer_name == '':
+                    raise JanusCloudError('No incoming call to accept', JANUS_P2PCALL_ERROR_NO_CALL)
                 if jsep is None:
-                    raise JanusCloudError('Missing SDP', JANUS_VIDEOCALL_ERROR_MISSING_SDP)
+                    raise JanusCloudError('Missing SDP', JANUS_P2PCALL_ERROR_MISSING_SDP)
 
-                # send accept request to backend server
-                result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
-            elif request == 'set':
-                if self.backend_handle:
-                    # send set request to backend server
-                    result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
-                else:
-                    body = set_schema.validate(body)
-                    if self._pending_set_body:
-                        self._pending_set_body.update(body)
-                    else:
-                        self._pending_set_body = body
-                    result = {
-                        'event': 'set'
+                # send the accepted event to the peer
+                call = {
+                    'videocall': 'event',
+                    'result': {
+                        'event': 'accepted',
+                        'username': self.p2pcall_user.username
                     }
+                }
+                self._send_plugin_event(self.p2pcall_user.peer_name, call, jsep)
+
+                result = {
+                    'event': 'accepted'
+                }
+
+            elif request == 'set':
+                if self.p2pcall_user is None or self.p2pcall_user.incall is False \
+                        or self.p2pcall_user.peer_name == '':
+                    raise JanusCloudError('Not in call', JANUS_P2PCALL_ERROR_NO_CALL)
+                if jsep is None:
+                    raise JanusCloudError('Missing SDP', JANUS_P2PCALL_ERROR_MISSING_SDP)
+
+                # send the accepted event to the peer
+                call = {
+                    'videocall': 'event',
+                    'result': {
+                        'event': 'update',
+                    }
+                }
+                self._send_plugin_event(self.p2pcall_user.peer_name, call, jsep)
+
+                result = {
+                    'event': 'set'
+                }
             elif request == 'hangup':
                 reason = str(body.get('reason', 'We did the hangup'))
 
-                if self.videocall_user and self.videocall_user.incall:
-                    # stop auto disconnect greenlet
-                    if self._auto_disconnect_greenlet:
-                        gevent.kill(self._auto_disconnect_greenlet)
-                        self._auto_disconnect_greenlet = None
-                    backend_handle = self.backend_handle
-                    self.backend_handle = None
-                    peer_name = self.videocall_user.peer_name
-                    self.videocall_user.peer_name = ''
-                    self.videocall_user.incall = False
-                    self.videocall_user.utime = time.time()
+                if self.p2pcall_user and self.p2pcall_user.incall:
 
-                    self._plugin.user_dao.update(self.videocall_user)
+                    peer_name = self.p2pcall_user.peer_name
+                    self.p2pcall_user.peer_name = ''
+                    self.p2pcall_user.incall = False
+                    self.p2pcall_user.utime = time.time()
+                    self._plugin.user_dao.update(self.p2pcall_user)
 
-                    if backend_handle:
-                        try:
-                            self._send_backend_meseage(backend_handle,
-                                                       {'request' : 'hangup', 'reason': reason})
-                        except Exception:
-                            log.exception('hangup backend handle failed')
-                        finally:
-                            backend_handle.detach()
-                    else:
-                        log.warn('backend_handle absent for user {}'.format(self.videocall_user.username))
+                    try:
+                        call = {
+                            'videocall': 'event',
+                            'result': {
+                                'event': 'hangup',
+                                'username': self.p2pcall_user.username,
+                                'reason': reason
+                            }
+                        }
+                        self._send_plugin_event(peer_name, call, jsep)
+                    except Exception:
+                        log.warning('fail to send hangup event to \'{}\''.format(peer_name))
 
                     log.debug("{} is hanging up the call with {}".format(
-                        self.videocall_user.username, peer_name)
+                        self.p2pcall_user.username, peer_name)
                     )
                 else:
-                    log.warn('No call to hangup')
+                    log.warning('No call to hangup')
 
-                if self.videocall_user:
-                    username = self.videocall_user.username
+                if self.p2pcall_user:
+                    username = self.p2pcall_user.username
                 else:
                     username = 'unkown'
                 result = {
@@ -317,8 +288,7 @@ class P2PCallHandle(FrontendHandleBase):
 
             else:
                 log.error('unknown request {}'.format(request))
-                raise JanusCloudError('Unknown request {{}}'.format(request), JANUS_VIDEOCALL_ERROR_INVALID_REQUEST)
-
+                raise JanusCloudError('Unknown request {{}}'.format(request), JANUS_P2PCALL_ERROR_INVALID_REQUEST)
 
             # Process successfully
             data = {
@@ -328,17 +298,16 @@ class P2PCallHandle(FrontendHandleBase):
                 data['result'] = result
             self._push_plugin_event(data, transaction=transaction)
 
-
         except JanusCloudError as e:
             log.exception('Fail to handle async message ({}) for handle {}'.format(body, self.handle_id))
-            self._push_plugin_event({'videocall':'event',
+            self._push_plugin_event({'videocall': 'event',
                               'error_code': e.code,
                               'error':str(e),
                               }, transaction=transaction)
         except SchemaError as e:
             log.exception('invalid message format ({}) for handle {}'.format(body, self.handle_id))
-            self._push_plugin_event({'videocall':'event',
-                              'error_code': JANUS_VIDEOCALL_ERROR_INVALID_ELEMENT,
+            self._push_plugin_event({'videocall': 'event',
+                              'error_code': JANUS_P2PCALL_ERROR_INVALID_ELEMENT,
                               'error':str(e),
                               }, transaction=transaction)
         except Exception as e:
@@ -347,7 +316,6 @@ class P2PCallHandle(FrontendHandleBase):
                               'error_code': JANUS_ERROR_BAD_GATEWAY,
                               'error':str(e),
                               }, transaction=transaction)
-
 
     def on_async_event(self, from_user, event_msg):
         if self._has_destroy:
@@ -358,72 +326,92 @@ class P2PCallHandle(FrontendHandleBase):
             jsep = event_msg.get('jsep')
             event = result.get('event', '')
             if event == 'hangup':
-                if self.videocall_user and self.videocall_user.incall:
-                    # stop auto disconnect greenlet
-                    if self._auto_disconnect_greenlet:
-                        gevent.kill(self._auto_disconnect_greenlet)
-                        self._auto_disconnect_greenlet = None
-                    backend_handle = self.backend_handle
-                    self.backend_handle = None
-                    self.videocall_user.peer_name = ''
-                    self.videocall_user.incall = False
-                    self.videocall_user.utime = time.time()
-                    self._plugin.user_dao.update(self.videocall_user)
-                    if backend_handle:
-                        backend_handle.detach()
-            elif event == 'update':
-                if self.videocall_user is None or self.videocall_user.incall == False:
-                    log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
-                    return
-            elif event == 'accepted':
-                if self.videocall_user is None or self.videocall_user.incall == False or \
-                    self.videocall_user.peer_name != result.get('username',''):
-                    # incomingcall event invalid, ignore it
-                    log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
-                    return
-            elif event == 'incomingcall':
-                # if receive incomingcll, means caller and callee has already connected to the same backend server,
-                # and caller send 'call' request successfully.
-                # double check state
-                if self.videocall_user is None or self.videocall_user.incall == False or \
-                    self.videocall_user.peer_name != result.get('username',''):
-                    # incomingcall event invalid, ignore it
-                    log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
-                    return
+                if self.p2pcall_user.incall:
+                    self.p2pcall_user.peer_name = ''
+                    self.p2pcall_user.incall = False
+                    self.p2pcall_user.utime = time.time()
+                    self._plugin.user_dao.update(self.p2pcall_user)
+                # always send hangup event to user
+                #else:
+                #    raise JanusCloudError('No call to hangup', JANUS_P2PCALL_ERROR_NO_CALL)
 
-            elif event == 'slow_link':
-                if self.videocall_user is None or self.videocall_user.incall == False:
-                    log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
-                    return
+            elif event == 'update':
+                if self.p2pcall_user.incall is False:
+                    raise JanusCloudError('Not in call', JANUS_P2PCALL_ERROR_NO_CALL)
+
+            elif event == 'accepted':
+                if self.p2pcall_user.incall is False or \
+                  self.p2pcall_user.peer_name != result.get('username', from_user):
+                    # incomingcall event invalid, ignore it
+                    raise JanusCloudError('No incoming call to accept', JANUS_P2PCALL_ERROR_NO_CALL)
+
+            elif event == 'incomingcall':
+                if self.p2pcall_user.incall:
+                    # incomingcall event invalid, raise a exception
+                    raise JanusCloudError('\'{}\' is busy'.format(self.p2pcall_user.username),
+                                          JANUS_P2PCALL_ERROR_INVALID_REQUEST)
+
+                self.p2pcall_user.incall = True
+                self.p2pcall_user.peer_name = result.get('username', from_user)
+                self.p2pcall_user.utime = time.time()
+                self._plugin.user_dao.update(self.p2pcall_user)
+
+                if len(self._pending_candidates) > 0:
+                    self._pending_candidates.clear()
             else:
-                if self.videocall_user is None or self.videocall_user.incall == False:
+                if self.p2pcall_user.incall is False:
                     log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
                     return
                 pass
 
             self._push_plugin_event(data, jsep)
+
+        elif event_msg['janus'] == 'trickle':
+            candidates = event_msg.get('candidates', None)
+            candidate = event_msg.get('candidate', None)
+            if candidate and not candidates:
+                candidates = [candidate]
+            for can in candidates:
+                self._push_event('trickle', candidate=can)
         else:
             params = dict()
             for key, value in event_msg.items():
                 if key not in ['janus', 'session_id', 'sender', 'opaque_id', 'transaction']:
                     params[key] = value
-            self._push_event(event_msg['janus'], None, **params)
+            self._push_event(event_msg['janus'], **params)
 
+    def _send_plugin_event(self, to_user, data, jsep=None):
+        params = dict()
+        params['plugindata'] = {
+            'plugin': self.plugin_package_name,
+            'data': data
+        }
+        if jsep:
+            params['jsep'] = jsep
+        event = create_janus_msg('event', **params)
+        self._send_aync_event(to_user, event)
 
-    def send_aync_event(self, to_user, event_msg):
+    def _send_aync_event(self, to_user, event_msg):
         if self.p2pcall_user is None:
-            raise JanusCloudError('Register a username first', JANUS_VIDEOCALL_ERROR_REGISTER_FIRST)
+            raise JanusCloudError('Register a username first', JANUS_P2PCALL_ERROR_REGISTER_FIRST)
         from_user = self.p2pcall_user.username
         peer = self._plugin.user_dao.get_by_username(to_user)
         if peer is None:
             raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(to_user),
-                                    JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME)
+                                    JANUS_P2PCALL_ERROR_NO_SUCH_USERNAME)
+
         if peer.handle:
+            log.debug('An async event ({}) is sent from \'{}\' to \'{}\' at local proxy'.format(
+                event_msg, from_user, to_user
+            ))
             # if dest user is handled by the same proxy, send to him directly
             peer.handle.on_async_event(from_user, event_msg)
         elif peer.api_url:
+            log.debug('An async event ({}) is sent from \'{}\' to \'{}\' by {}'.format(
+                event_msg, from_user, to_user, peer.api_url
+            ))
             r = requests.post(peer.api_url,
-                              json = {
+                              json={
                                   'from_user': from_user,
                                   'async_event': event_msg
                               })
@@ -435,14 +423,11 @@ class P2PCallHandle(FrontendHandleBase):
                 raise JanusCloudError(text, r.status_code)
         else:
             raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(to_user),
-                                    JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME)
-
-
+                                    JANUS_P2PCALL_ERROR_NO_SUCH_USERNAME)
 
 
 class P2PCallPlugin(PluginBase):
     """ This base class for plugin """
-
 
     def __init__(self, proxy_config, backend_server_mgr, pyramid_config):
         super().__init__(proxy_config, backend_server_mgr, pyramid_config)
@@ -462,7 +447,7 @@ class P2PCallPlugin(PluginBase):
         #print('api_base_url:', self.api_base_url)
 
         includeme(pyramid_config)
-        pyramid_config.registry.videocall_plugin = self
+        pyramid_config.registry.p2pcall_plugin = self
 
         log.info('{} initialized!'.format(JANUS_P2PCALL_NAME))
 
@@ -491,41 +476,18 @@ class P2PCallPlugin(PluginBase):
         p2pcall_user = self.user_dao.get_by_username(to_user)
         if p2pcall_user is None:
             raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(to_user),
-                                    JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME)
+                                    JANUS_P2PCALL_ERROR_NO_SUCH_USERNAME)
         if p2pcall_user.handle is None:
             raise JanusCloudError('Not support relay http request',
-                                        JANUS_VIDEOCALL_ERROR_INVALID_REQUEST)
-        pass
-    def call_peer(self, peer_username, caller_username, backend_server_url, backend_keepalive_interval):
-        peer = self.user_dao.get_by_username(peer_username)
-        if peer is None:
-            raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(peer_username),
-                                    JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME)
-        if peer.handle:
-            peer.handle.handle_incoming_call(caller_username, backend_server_url, backend_keepalive_interval)
-        elif peer.api_url:
-            caller = self.user_dao.get_by_username(caller_username)
-            if caller is None or caller.handle is None:
-                raise JanusCloudError('Not support relay http request',
-                                        JANUS_VIDEOCALL_ERROR_INVALID_REQUEST)
-            r = requests.post(peer.api_url,
-                              data = {'caller_username': caller_username,
-                                      'backend_server_url': backend_server_url,
-                                      'backend_keepalive_interval':str(backend_keepalive_interval)})
-            if r.status_code != requests.codes.ok:
-                try:
-                    text = r.json()['info']
-                except Exception:
-                    text = r.text
-                raise JanusCloudError(text, r.status_code)
-
-
-
+                                        JANUS_P2PCALL_ERROR_INVALID_REQUEST)
+        log.debug('an async event ({}) from \'{}\' to \'{}\' is received by http API'.
+                  format(async_event, from_user, to_user))
+        p2pcall_user.handle.on_async_event(from_user, async_event)
 
     @staticmethod
     def read_config(config_file):
 
-        videocall_config_schema = Schema({
+        p2pcall_config_schema = Schema({
             Optional("general"): Default({
                 Optional("user_db"): Default(StrVal(), default='memory'),
                 AutoDel(str): object  # for all other key we don't care
@@ -535,9 +497,9 @@ class P2PCallPlugin(PluginBase):
         })
         #print('config file:', config_file)
         if config_file is None or config_file == '':
-            config = videocall_config_schema.validate({})
+            config = p2pcall_config_schema.validate({})
         else:
-            config = parse_config(config_file, videocall_config_schema)
+            config = parse_config(config_file, p2pcall_config_schema)
 
         # check other configure option is valid or not
 
@@ -550,10 +512,16 @@ class P2PCallPlugin(PluginBase):
         return 'http://' + server_name + ':' + str(port) + JANUS_P2PCALL_API_BASE_PATH
 
 
-
 def includeme(config):
     config.add_route('p2pcall_user', JANUS_P2PCALL_API_BASE_PATH + '/{username}')
     config.scan('januscloud.proxy.plugin.p2pcall')
+
+
+post_p2pcall_user_schema = Schema({
+    'from_user': StrRe('^\w{1, 128}$'),
+    'async_event': dict,
+    AutoDel(str): object  # for all other key we auto delete
+})
 
 
 @post_view(route_name='p2pcall_user')
@@ -561,7 +529,7 @@ def post_video_user(request):
     params = get_params_from_request(request, post_p2pcall_user_schema)
     username = request.matchdict['username']
     #print('username:', username)
-    request.registry.videocall_plugin.call_peer(to_user=username, **params)
+    request.registry.p2pcall_plugin.handle_async_event(to_user=username, **params)
     return Response(status=200)
 
 

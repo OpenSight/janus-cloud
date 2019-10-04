@@ -84,9 +84,10 @@ class VideoCallUser(object):
         self.ctime = time.time()
 
     def __str__(self):
-        return 'Video Call User"{0}"({1})'.format(self.name, self.url)
+        return 'Video Call User"{0}"({1})'.format(self.username, self.api_url)
 
 class VideoCallHandle(FrontendHandleBase):
+
     def __init__(self, handle_id, session, plugin, opaque_id=None, *args, **kwargs):
         super().__init__(handle_id, session, plugin, opaque_id, *args, **kwargs)
 
@@ -98,7 +99,6 @@ class VideoCallHandle(FrontendHandleBase):
         self._pending_set_body = None
         self._auto_disconnect_greenlet = None
 
-
     def detach(self):
         if self._has_destroy:
             return
@@ -109,7 +109,9 @@ class VideoCallHandle(FrontendHandleBase):
 
         if self.videocall_user:
             self._plugin.user_dao.del_by_username(self.videocall_user.username)
+            self.videocall_user.handle = None
             self.videocall_user = None
+
         if self.backend_handle:
             backend_handle = self.backend_handle
             self.backend_handle = None
