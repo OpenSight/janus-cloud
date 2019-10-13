@@ -357,6 +357,8 @@ class P2PCallHandle(FrontendHandleBase):
                 self._plugin.user_dao.update(self.p2pcall_user)
 
                 if len(self._pending_candidates) > 0:
+                    log.warning('Pending candidates {} before incomingcall, would be cleared'.
+                                format(self._pending_candidates))
                     self._pending_candidates.clear()
             else:
                 if self.p2pcall_user.incall is False:
