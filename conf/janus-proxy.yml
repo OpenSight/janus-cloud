@@ -49,6 +49,7 @@ plugins:
   - januscloud.proxy.plugin.dummytest:DummyTestPlugin
   - januscloud.proxy.plugin.echotest:EchoTestPlugin
   - januscloud.proxy.plugin.videocall:VideoCallPlugin
+  - januscloud.proxy.plugin.p2pcall:P2PCallPlugin
 
 # Configuration for the websocket transport. 
 # Websocket transport module outputs the Janus api on websocket protocol just as Janus server
