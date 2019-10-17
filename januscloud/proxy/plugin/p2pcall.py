@@ -268,7 +268,7 @@ class P2PCallHandle(FrontendHandleBase):
                         }
                         self._send_plugin_event(peer_name, call, jsep)
                     except Exception:
-                        log.warning('fail to send hangup event to \'{}\''.format(peer_name))
+                        log.warning('fail to hangup to \'{}\''.format(peer_name))
 
                     log.debug("{} is hanging up the call with {}".format(
                         self.p2pcall_user.username, peer_name)
@@ -298,6 +298,9 @@ class P2PCallHandle(FrontendHandleBase):
                 data['result'] = result
             self._push_plugin_event(data, transaction=transaction)
 
+            if result and result['event'] == 'accepted':
+                self._push_event('webrtcup')
+
         except JanusCloudError as e:
             log.exception('Fail to handle async message ({}) for handle {}'.format(body, self.handle_id))
             self._push_plugin_event({'videocall': 'event',
@@ -326,14 +329,15 @@ class P2PCallHandle(FrontendHandleBase):
             jsep = event_msg.get('jsep')
             event = result.get('event', '')
             if event == 'hangup':
-                if self.p2pcall_user.incall:
+                if self.p2pcall_user.incall and \
+                  self.p2pcall_user.peer_name == result.get('username', from_user):
                     self.p2pcall_user.peer_name = ''
                     self.p2pcall_user.incall = False
                     self.p2pcall_user.utime = time.time()
                     self._plugin.user_dao.update(self.p2pcall_user)
                 # always send hangup event to user
-                #else:
-                #    raise JanusCloudError('No call to hangup', JANUS_P2PCALL_ERROR_NO_CALL)
+                else:
+                    raise JanusCloudError('No call to hangup', JANUS_P2PCALL_ERROR_NO_CALL)
 
             elif event == 'update':
                 if self.p2pcall_user.incall is False:
@@ -367,6 +371,9 @@ class P2PCallHandle(FrontendHandleBase):
                 pass
 
             self._push_plugin_event(data, jsep)
+
+            if event == 'accepted':
+                self._push_event('webrtcup')
 
         elif event_msg['janus'] == 'trickle':
             candidates = event_msg.get('candidates', None)
