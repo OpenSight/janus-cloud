@@ -298,7 +298,7 @@ class P2PCallHandle(FrontendHandleBase):
                 data['result'] = result
             self._push_plugin_event(data, transaction=transaction)
 
-            if result and result['event'] == 'accepted':
+            if result and result.get('event') == 'accepted':
                 self._push_event('webrtcup')
 
         except JanusCloudError as e:
