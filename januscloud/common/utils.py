@@ -76,3 +76,6 @@ def get_monotonic_time():
 
 def random_uint64():
     return random.randint(1, 9007199254740992)
+
+def random_uint32():
+    return random.randint(1, 4294967295)

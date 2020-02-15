@@ -188,7 +188,7 @@ class BackendSession(object):
     def _recv_msg_cbk(self, msg):
         try:
             if 'transaction' in msg:
-                transaction = self._transactions.get(msg['transaction'])
+                transaction = self._transactions.get(msg['transaction'], None)
                 if transaction:
                     transaction.response = msg
             elif msg['janus'] == 'timeout':

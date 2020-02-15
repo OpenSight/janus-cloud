@@ -168,13 +168,13 @@ class FrontendSessionManager(object):
                         self._kick_timeout_sessions(session)
                     except Exception as e:
                         log.exception('Failed to kick out the timeout session "{}"'.format(session.session_id))
-
+                timeout_sessions.clear()
                 delta_time = get_monotonic_time() - now
                 if delta_time < TIMEOUT_CHECK_INTERVAL:
                     gevent.sleep(TIMEOUT_CHECK_INTERVAL - delta_time)
             else:
                 # session timeout check is disable, just None loop
-                gevent.sleep(2)
+                gevent.sleep(TIMEOUT_CHECK_INTERVAL)
 
     def _kick_timeout_sessions(self, session):
         session_id = session.session_id

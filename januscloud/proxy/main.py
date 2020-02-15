@@ -32,7 +32,7 @@ def do_main(config):
     from januscloud.common.logger import set_root_logger
     from januscloud.transport.ws import WSServer
     import importlib
-    from januscloud.common.error import JanusCloudError,JANUS_ERROR_NOT_IMPLEMENTED
+    from januscloud.common.error import JanusCloudError, JANUS_ERROR_NOT_IMPLEMENTED
 
     set_root_logger(**(config['log']))
 

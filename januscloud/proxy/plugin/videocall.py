@@ -258,7 +258,6 @@ class VideoCallHandle(FrontendHandleBase):
                             backend_handle.detach()
                         raise
 
-
             elif request == 'accept':
                 if self.videocall_user is None or self.videocall_user.incall == False \
                         or self.videocall_user.peer_name == '' or self.backend_handle is None:
