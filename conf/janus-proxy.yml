@@ -59,7 +59,8 @@ ws_transport:
 
   json: "indented"                  # Whether the JSON messages should be indented (default),
                                     # plain (no indentation) or compact (no indentation and no spaces)
-  #pingpong_trigger: 30             # After how many seconds of idle, a PING should be sent
+  #pingpong_trigger: 30             # After how many seconds of idle, a PING should be sent, 0 means no ping would be
+                                    # sent
   #pingpong_timeout: 10             # After how many seconds of not getting a PONG, a timeout should be detected
 
   ws: true                          # Whether to enable the WebSockets API

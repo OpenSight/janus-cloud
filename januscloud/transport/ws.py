@@ -11,6 +11,7 @@ from gevent import Greenlet
 from gevent.lock import RLock
 from gevent.pool import Pool
 from januscloud.proxy.core.request import Request
+from januscloud.common.utils import get_monotonic_time
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,17 @@ class WSServerConn(WebSocket):
         self._recv_msg_cbk = None
         self._closed_cbk = None
 
+        # pingpong check mechanism
+        self._ping_ts = 0
+        self._last_active_ts = 0
+        self._pingpong_check_greenlet = None
+        self._pingpong_trigger = self.environ.get('pingpong_trigger', 0)
+        self._pingpong_timeout = self.environ.get('pingpong_timeout', 0)
+        if self._pingpong_trigger:
+            if self._pingpong_timeout < 1:
+                log.warning('pingpong_timeout cannot be less than 1 sec, adjust it to 1 secs')
+                self._pingpong_timeout = 1
+
     def __str__(self):
         return 'websocket server connection with {0}'.format(self.peer_address)
 
@@ -59,6 +71,11 @@ class WSServerConn(WebSocket):
                 lock.release()
         self.sock.sendall = sendall
 
+        # start check idle
+        if self._pingpong_trigger:
+            self._last_active_ts = get_monotonic_time()
+            self._pingpong_check_greenlet = gevent.spawn(self._pingpong_check_routine)
+
         # create app
         try:
             if not self.environ.get('QUERY_STRING'):
@@ -76,10 +93,17 @@ class WSServerConn(WebSocket):
 
     def closed(self, code, reason=None):
         log.info('Closed {0}: {1}'.format(self, reason))
+        self._pingpong_check_greenlet = None
         if self._closed_cbk:
             self._closed_cbk(self)
 
+    def ponged(self, pong):
+        self._ping_ts = 0
+        self._last_active_ts = get_monotonic_time()
+
     def received_message(self, message):
+        if self._pingpong_trigger:
+            self._last_active_ts = get_monotonic_time()
         if message.is_text:
             # log.debug('Received message from {0}: {1}'.format(self, message))
             if self._recv_msg_cbk:
@@ -102,10 +126,13 @@ class WSServerConn(WebSocket):
         """
         if self.server_terminated:
             raise Exception('Already closed: {0}'.format(self))
+        if self._pingpong_trigger:
+            self._last_active_ts = get_monotonic_time()
         with gevent.Timeout(seconds=timeout):
             self.send(self._msg_encoder.encode(message), binary=False)
         #log.debug("Sent message to {0}: {1}".format(self, self._msg_encoder.encode(message)))
 
+    # transport session interface methods
     def session_created(self, session_id=""):
         pass
 
@@ -119,10 +146,33 @@ class WSServerConn(WebSocket):
         log.error('Failed to handle received msg on {0}: {1}'.format(self, g.exception))
         self.close()
 
+    def _pingpong_check_routine(self):
+        while not self.server_terminated:
+            gevent.sleep(1)
+            if self.server_terminated:
+                break
+            now = get_monotonic_time()
+            # check pingpong timeout
+            if self._ping_ts:
+                if now - self._ping_ts > self._pingpong_timeout:
+                    self.close()
+                    break
+            # send ping if idle
+            if self._last_active_ts and now - self._last_active_ts >= self._pingpong_trigger:
+                try:
+                    self.ping('')
+                    self._last_active_ts = get_monotonic_time()
+                except Exception as e:
+                    log.error('Fail to send ping on {}: {}'.format(self, str(e)))
+                    self.close()
+                    break
+
 
 class WSServer(object):
 
-    def __init__(self, listen, request_handler, msg_handler_pool_size=1024, indent='indented', keyfile=None, certfile=None):
+    def __init__(self, listen, request_handler, msg_handler_pool_size=1024, indent='indented',
+                 pingpong_trigger=0, pingpong_timeout=0,
+                 keyfile=None, certfile=None):
         """
         :param listen: string ip:port
         :param request_handler: instance of januscloud.proxy.core.request:RequestHandler
@@ -154,7 +204,9 @@ class WSServer(object):
             {
                 'app.recv_msg_cbk': self._async_incoming_msg_handler,
                 'app.closed_cbk': self._request_handler.transport_gone,
-                'json_indent': indent
+                'json_indent': indent,
+                'pingpong_trigger': pingpong_trigger,
+                'pingpong_timeout': pingpong_timeout
             }
         )
 

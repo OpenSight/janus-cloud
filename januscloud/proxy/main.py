@@ -99,16 +99,22 @@ def do_main(config):
                 msg_handler_pool_size=config['ws_transport']['max_greenlet_num'],
                 indent=config['ws_transport']['json'],
                 keyfile=cert_key_file,
-                certfile=cert_pem_file
+                certfile=cert_pem_file,
+                pingpong_trigger=config['ws_transport']['pingpong_trigger'],
+                pingpong_timeout=config['ws_transport']['pingpong_timeout'],
 
             )
             server_list.append(wss_server)
 
         if config['ws_transport']['ws']:
-            ws_server = WSServer(config['ws_transport']['ws_listen'],
-                                 request_handler,
-                                 msg_handler_pool_size=config['ws_transport']['max_greenlet_num'],
-                                 indent=config['ws_transport']['json'])
+            ws_server = WSServer(
+                config['ws_transport']['ws_listen'],
+                request_handler,
+                msg_handler_pool_size=config['ws_transport']['max_greenlet_num'],
+                indent=config['ws_transport']['json'],
+                pingpong_trigger=config['ws_transport']['pingpong_trigger'],
+                pingpong_timeout=config['ws_transport']['pingpong_timeout'],
+            )
             server_list.append(ws_server)
 
         log.info('Started Janus Proxy')
