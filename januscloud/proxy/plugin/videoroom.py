@@ -311,6 +311,9 @@ class VideoRoomSubscriber(object):
                                   JANUS_VIDEOROOM_ERROR_INVALID_SDP)
 
         backend_server, backend_room_id = publisher.get_backend_server()
+        if backend_server is None or backend_room_id == 0:
+            raise JanusCloudError('No such feed ({})'.format(publisher.user_id),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
 
         # backend session
         backend_session = get_backend_session(backend_server.url, backend_server.session_timeout / 3,
@@ -1219,6 +1222,14 @@ class VideoRoom(object):
         if publisher is None:
             return  # already removed
         self._private_id.pop(publisher.pvt_id, None)
+
+        if publisher.webrtc_started:
+            event = {
+                'videoroom': 'event',
+                'room': self.room_id,
+                'unpublished': participant_id
+            }
+            self.notify_other_participants(publisher, event)
 
         event = {
             'videoroom': 'event',
