@@ -71,7 +71,7 @@ room_base_schema = Schema({
     AutoDel(str): object  # for all other key we must delete
 })
 room_params_schema = Schema({
-    Optional('description'): StrRe('^\w{1,128}$'),
+    Optional('description'): StrVal(max_len=256),
     Optional('secret'): StrVal(max_len=256),
     Optional('pin'): StrVal(max_len=256),
     Optional('is_private'): BoolVal(),
@@ -2043,7 +2043,7 @@ class VideoRoomPlugin(PluginBase):
                 'backend_engine {} not support by videoroom plugin'.format(self.config['general']['backend_engine']),
                 JANUS_ERROR_NOT_IMPLEMENTED)
 
-        self.room_mgr.load_from_config(self.config['general']['rooms'])
+        self.room_mgr.load_from_config(self.config['rooms'])
 
         includeme(pyramid_config)
         pyramid_config.registry.videoroom_plugin = self
