@@ -151,7 +151,7 @@ publisher_configure_schema = Schema({
     Optional('data'): BoolVal(),
     Optional('audiocodec'): StrVal(max_len=256),
     Optional('videocodec'): StrVal(max_len=256),
-    Optional('bitrate'): IntVal(min=1),
+    Optional('bitrate'): IntVal(min=0),
     Optional('keyframe'): BoolVal(),
     Optional('record'): BoolVal(),
     Optional('filename'): StrVal(max_len=256),
@@ -166,7 +166,7 @@ publisher_publish_schema = Schema({
     Optional('data'): BoolVal(),
     Optional('audiocodec'): StrVal(max_len=256),
     Optional('videocodec'): StrVal(max_len=256),
-    Optional('bitrate'): IntVal(min=1),
+    Optional('bitrate'): IntVal(min=0),
     Optional('record'): BoolVal(),
     Optional('filename'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
@@ -610,7 +610,7 @@ class VideoRoomPublisher(object):
                 subscribers = self._subscribers.copy()
                 self._subscribers.clear()
                 for subscriber in subscribers:
-                    subscriber.on_feed_hangup()
+                    subscriber.on_feed_hangup(self)
 
         if self._frontend_handle:
             self._frontend_handle.on_participant_detach(self)
@@ -676,6 +676,8 @@ class VideoRoomPublisher(object):
                 'room': backend_room_id,
                 'id': self.user_id
             }
+            if self.display:
+                body['display'] = self.display
             _send_backend_meseage(backend_handle, body)
 
         except Exception:
@@ -701,7 +703,7 @@ class VideoRoomPublisher(object):
 
     def publish(self, audio=None, video=None, data=None,
                 audiocodec='', videocodec='',
-                bitrate=0,
+                bitrate=-1,
                 record=None, filename='',
                 display='',
                 jsep=None):
@@ -719,7 +721,7 @@ class VideoRoomPublisher(object):
 
     def configure(self, audio=None, video=None, data=None,
                   audiocodec='', videocodec='',
-                  bitrate=0, keyframe=False,
+                  bitrate=-1, keyframe=False,
                   record=None, filename='',
                   display='', update=False,
                   jsep=None):
@@ -763,7 +765,7 @@ class VideoRoomPublisher(object):
             body['audiocodec'] = audiocodec
         if videocodec:
             body['videocodec'] = videocodec
-        if bitrate:
+        if bitrate >= 0:
             body['bitrate'] = bitrate
         if record:
             body['record'] = record
@@ -947,7 +949,7 @@ class VideoRoomPublisher(object):
                     subscribers = self._subscribers.copy()
                     self._subscribers.clear()
                     for subscriber in subscribers:
-                        subscriber.on_feed_hangup()
+                        subscriber.on_feed_hangup(self)
 
             params = dict()
             for key, value in event_msg.items():
@@ -991,7 +993,7 @@ class VideoRoom(object):
         self.require_pvtid = require_pvtid       # Whether subscriptions in this room require a private_id
         self.publishers = publishers             # Maximum number of concurrent publishers, 0 means no limited
         self.bitrate = bitrate                   # Global bitrate limit
-        if self.bitrate < 64000:
+        if 0 < self.bitrate < 64000:
             self.bitrate = 64000  # Don't go below 64k
         self.bitrate_cap = bitrate_cap           # Whether the above limit is insormountable
         self.fir_freq = fir_freq                 # Regular FIR frequency (0=disabled)
@@ -1003,12 +1005,12 @@ class VideoRoom(object):
         if self.opus_fec and 'opus' not in self.audiocodec:
             self.opus_fec = False
             log.warning('Inband FEC is only supported for rooms that allow Opus: disabling it...')
-
+        
+        self.video_svc = False
         if video_svc:                         # Whether SVC must be done for video
             if self.videocodec == ['vp9']:
                 self.video_svc = True
             else:
-                self.video_svc = False
                 log.warning('SVC is only supported, in an experimental way, for VP9 only rooms: disabling it...')
                                                  # (note: only available for VP9 right now)
 
@@ -1223,13 +1225,13 @@ class VideoRoom(object):
             return  # already removed
         self._private_id.pop(publisher.pvt_id, None)
 
-        if publisher.webrtc_started:
-            event = {
-                'videoroom': 'event',
-                'room': self.room_id,
-                'unpublished': participant_id
-            }
-            self.notify_other_participants(publisher, event)
+#        if publisher.webrtc_started:
+#            event = {
+#                'videoroom': 'event',
+#                'room': self.room_id,
+#                'unpublished': participant_id
+#            }
+#            self.notify_other_participants(publisher, event)
 
         event = {
             'videoroom': 'event',
@@ -1368,7 +1370,7 @@ class VideoRoomManager(object):
             room.require_pvtid = new_require_pvtid
         if new_bitrate is not None:
             room.bitrate = new_bitrate
-            if room.bitrate < 64000:
+            if 0 < room.bitrate < 64000:
                 room.bitrate = 64000    # Don't go below 64k
         if new_publishers is not None:
             room.publishers = new_publishers
@@ -1747,7 +1749,7 @@ class VideoRoomHandle(FrontendHandleBase):
                         if request == 'joinandconfigure':
                             room.check_max_publishers()
 
-                        new_publisher = room.new_participant(user_id=join_params.get('id', ''),
+                        new_publisher = room.new_participant(user_id=join_params.get('id', 0),
                                                              handle=self,
                                                              display=join_params.get('display', ''))
                         try:
@@ -1925,7 +1927,7 @@ class VideoRoomHandle(FrontendHandleBase):
                         'room': room_id,
                         'leaving': 'ok',
                     }
-                if request == 'join' or request == 'joinandconfigure':
+                elif request == 'join' or request == 'joinandconfigure':
                     raise JanusCloudError('Already in as a publisher on this handle',
                                           JANUS_VIDEOROOM_ERROR_ALREADY_JOINED)
                 else:
@@ -2091,7 +2093,7 @@ class VideoRoomPlugin(PluginBase):
                 Optional('pin'): StrVal(),
                 Optional('require_pvtid'): BoolVal(),
                 Optional('publishers'): IntVal(min=1, max=8192),
-                Optional('bitrate'): IntVal(min=1),
+                Optional('bitrate'): IntVal(min=0),
                 Optional('bitrate_cap'): BoolVal(),
                 Optional('fir_freq'): IntVal(min=0),
                 Optional('audiocodec'): ListVal(EnumVal(['opus', 'g722', 'pcmu', 'pcma', 'isac32', 'isac16'])),
