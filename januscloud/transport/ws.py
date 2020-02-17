@@ -155,13 +155,14 @@ class WSServerConn(WebSocket):
             # check pingpong timeout
             if self._ping_ts:
                 if now - self._ping_ts > self._pingpong_timeout:
+                    log.debug('Close ws connection ({}) because of no pong'. format(self))
                     self.close()
                     break
             # send ping if idle
             if self._last_active_ts and now - self._last_active_ts >= self._pingpong_trigger:
                 try:
                     self.ping('')
-                    self._last_active_ts = get_monotonic_time()
+                    self._last_active_ts = self._ping_ts = get_monotonic_time()
                 except Exception as e:
                     log.error('Fail to send ping on {}: {}'.format(self, str(e)))
                     self.close()
