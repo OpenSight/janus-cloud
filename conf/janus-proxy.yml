@@ -4,7 +4,7 @@
 general:
   daemonize: false                       # Whether Janus-proxy should run as a daemon
                                         # or not (default=run in foreground)
-  # configs_folder: "/etc/janus-cloud"    # Configuration files folder, default is the same
+  # configs_folder: "/etc/januscloud"    # Configuration files folder, default is the same
                                         # with the folder containing this config file
   server_name: "127.0.0.1"              # IP address or hostname of this Janus proxy,
                                         # it will appear in an info request, and is used for cluster addressing
