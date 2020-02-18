@@ -640,9 +640,11 @@ class VideoRoomPublisher(object):
         backend_handle = backend_session.attach_handle(JANUS_VIDEOROOM_PACKAGE, handle_listener=self)
         backend_room_id = 0
         try:
+
             # create a single room
             body = {
                 'request':  'create',
+                'description': 'januscloud-{}'.format(self.user_id),
                 'permanent': False,
                 'is_private': False,
                 'require_pvtid': False,
@@ -663,6 +665,9 @@ class VideoRoomPublisher(object):
                 'rec_dir': self.room.rec_dir,
                 'notify_joining': False,
             }
+            if self.display:
+                body['description'] = 'januscloud-{}'.format(self.display)
+
             data, reply_jsep = _send_backend_meseage(backend_handle, body)
             backend_room_id = data.get('room', 0)
             if backend_room_id == 0:
@@ -1449,6 +1454,96 @@ class VideoRoomManager(object):
                 gevent.sleep(ROOM_CLEANUP_CHECK_INTERVAL)
 
 
+class VideoRoomBackendSweeper(object):
+    LIST_CHECK_INTERVAL = 10
+
+    def __init__(self, backend_server_mgr, idle_room_check_interval=600):
+        self._backend_server_mgr = backend_server_mgr
+        self._idle_room_check_interval = idle_room_check_interval
+        self._servers = {}
+        self._idle_room_check_greenlets = {}
+        self._server_list_check_greenlet = gevent.spawn(self._server_list_check_routine)
+        self._has_destroy = False
+
+    def destroy(self):
+        if self._has_destroy:
+            return
+        self._has_destroy = True
+        self._server_list_check_greenlet = None
+        self._idle_room_check_greenlets.clear()
+        self._servers.clear()
+
+    def _server_list_check_routine(self):
+        while not self._has_destroy:
+            gevent.sleep(VideoRoomBackendSweeper.LIST_CHECK_INTERVAL)
+            if self._has_destroy:
+                break
+
+            valid_server_list = self._backend_server_mgr.get_valid_server_list()
+            valid_server_names = {server.name for server in valid_server_list}
+            cur_server_names = set(self._servers)
+
+            # remove the invalid servers
+            server_names_to_remove = cur_server_names.difference(valid_server_names)
+            for name in server_names_to_remove:
+                self._servers.pop(name, None)
+                self._idle_room_check_greenlets.pop(name, None)
+
+            # add the new valid servers
+            for server in valid_server_list:
+                if server.name not in self._servers:
+                    self._servers[server.name] = server
+                    self._idle_room_check_greenlets[server.name] = gevent.spawn(
+                        self._idle_room_check_routine, server
+                    )
+
+    def _idle_room_check_routine(self, server):
+        idle_rooms = set()
+        backend_handle = None
+        while gevent.getcurrent() == self._idle_room_check_greenlets.get(server.name):
+            gevent.sleep(self._idle_room_check_interval)
+            if gevent.getcurrent() != self._idle_room_check_greenlets.get(server.name):
+                break
+            try:
+                if backend_handle is None:
+                    # backend session
+                    backend_session = get_backend_session(server.url, server.session_timeout / 3,
+                                                  auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
+
+                    # attach backend handle
+                    backend_handle = backend_session.attach_handle(JANUS_VIDEOROOM_PACKAGE)
+
+                reply_data, reply_jsep = _send_backend_meseage(backend_handle, {
+                    'request': 'list'
+                })
+                room_list_info = reply_data.get('rooms', [])
+                last_idle_rooms = idle_rooms
+                idle_rooms = set()
+                for room_info in room_list_info:
+                    room_id = room_info.get('room', 0)
+
+                    if room_id == 0 or room_info.get('num_participants', 1) > 0:
+                        continue   # pass invalid or in-service room
+                    if not room_info.get('description', '').startswith('januscloud'):
+                        continue   # pass not januscloud-created room
+
+                    # this is a idle room
+                    if room_id in last_idle_rooms:
+                        # auto destroy the idle room
+                        log.warning('Auto destroy the backend room {} for server {}'.format(room_id, server.url))
+                        backend_handle.send_message({
+                            'request': 'destroy',
+                            'room': room_id
+                        })
+                    else:
+                        idle_rooms.add(room_id)  # destroy next time
+
+            except Exception:
+                # pass the exception
+                backend_handle.detach()
+                backend_handle = None
+
+
 class VideoRoomHandle(FrontendHandleBase):
 
     def __init__(self, handle_id, session, plugin, opaque_id=None, *args, **kwargs):
@@ -2050,6 +2145,13 @@ class VideoRoomPlugin(PluginBase):
         includeme(pyramid_config)
         pyramid_config.registry.videoroom_plugin = self
 
+        self.backend_sweeper = None
+        if self.config['backend_sweeper']['enable']:
+            self.self.backend_sweeper = VideoRoomBackendSweeper(
+                backend_server_mgr=backend_server_mgr,
+                idle_room_check_interval=self.config['backend_sweeper']['backend_idle_room_check_interval']
+            )
+
         log.info('{} initialized!'.format(JANUS_VIDEOROOM_NAME))
 
     def get_version(self):
@@ -2081,10 +2183,13 @@ class VideoRoomPlugin(PluginBase):
                 Optional("room_db"): Default(StrVal(), default='memory'),
                 Optional("room_auto_destroy_timeout"): Default(IntVal(min=0, max=86400), default=0),
                 Optional("admin_key"): Default(StrVal(), default=''),
-                Optional("backend_idle_room_cleanup"): Default(BoolVal(), default=True),
                 AutoDel(str): object  # for all other key we don't care
             }, default={}),
-
+            Optional("backend_sweeper"): Default({
+                Optional("backend_idle_room_check_interval"): Default(IntVal(min=1, max=86400), default=600),
+                Optional("enable"): Default(BoolVal(), default=True),
+                AutoDel(str): object  # for all other key we don't care
+            }, default={}),
             Optional("rooms"): Default([{
                 'room_id': IntVal(),
                 Optional('description'): StrVal(),

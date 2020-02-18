@@ -32,11 +32,12 @@ class BackendServer(object):
     def __str__(self):
         return 'Backend Server"{0}"({1})'.format(self.name, self.url)
 
-SERVER_EXPIRE_CHECK_INTERVAL = 60
 
 class BackendServerManager(object):
 
-    def __init__(self, select_mode, static_server_list=[], server_dao=None):
+    SERVER_EXPIRE_CHECK_INTERVAL = 60
+
+    def __init__(self, select_mode, static_server_list=[], server_dao=None, ):
 
         self._server_dao = server_dao
         self._rr_index = 0
@@ -69,6 +70,7 @@ class BackendServerManager(object):
             server.status = status
             for (k, v) in kwargs.items():
                 if k in ("session_timeout", "location", "isp", "session_num", "handle_num"):
+
                     setattr(server, k, v)
             server.utime = time.time()
             self._server_dao.update(server)
@@ -79,6 +81,9 @@ class BackendServerManager(object):
             log.info('Backend Server {} ({}) is removed from proxy'.format(server.name, server.url))
             self._server_dao.del_by_name(name)
 
+    def get_valid_server_list(self):
+        return BackendServerManager.get_valid_servers(self._server_dao)
+
     @staticmethod
     def get_valid_servers(server_dao):
         valid_servers = []
@@ -88,7 +93,6 @@ class BackendServerManager(object):
                     (server.expire == 0 or now - server.utime < server.expire):
                 valid_servers.append(server)
         return valid_servers
-
 
     def _rand_algo(self, server_dao, session_transport):
         server_list = BackendServerManager.get_valid_servers(server_dao)
@@ -120,10 +124,9 @@ class BackendServerManager(object):
     def choose_server(self, transport):
         return self._select_algorithm(self._server_dao, transport)
 
-
     def _check_expired_routine(self):
         while True:
-            gevent.sleep(SERVER_EXPIRE_CHECK_INTERVAL)
+            gevent.sleep(BackendServerManager.SERVER_EXPIRE_CHECK_INTERVAL)
             now = time.time()
             for server in self._server_dao.get_list():
                 if server.expire and now - server.utime >= server.expire:
