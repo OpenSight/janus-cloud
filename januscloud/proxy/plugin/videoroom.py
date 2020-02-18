@@ -1516,7 +1516,7 @@ class VideoRoomBackendSweeper(object):
                 reply_data, reply_jsep = _send_backend_meseage(backend_handle, {
                     'request': 'list'
                 })
-                room_list_info = reply_data.get('rooms', [])
+                room_list_info = reply_data.get('list', [])
                 last_idle_rooms = idle_rooms
                 idle_rooms = set()
                 for room_info in room_list_info:
@@ -1528,9 +1528,10 @@ class VideoRoomBackendSweeper(object):
                         continue   # pass not januscloud-created room
 
                     # this is a idle room
+                    # log.debug('found idle room {}, last_idle_rooms: {}, idle_rooms:{}'.format(room_id, last_idle_rooms, idle_rooms))
                     if room_id in last_idle_rooms:
                         # auto destroy the idle room
-                        log.warning('Auto destroy the backend room {} for server {}'.format(room_id, server.url))
+                        log.warning('Sweeper found the backend idle room {} for server {}, destroy it'.format(room_id, server.url))
                         backend_handle.send_message({
                             'request': 'destroy',
                             'room': room_id
@@ -1538,9 +1539,12 @@ class VideoRoomBackendSweeper(object):
                     else:
                         idle_rooms.add(room_id)  # destroy next time
 
-            except Exception:
+            except Exception as e:
                 # pass the exception
-                backend_handle.detach()
+                log.debug('Videoroom backend sweeper failed on server {}: {}. Retry in {} secs'.format(
+                    server.url, str(e), self._idle_room_check_interval))
+                if backend_handle:
+                    backend_handle.detach()
                 backend_handle = None
 
 
@@ -2147,7 +2151,7 @@ class VideoRoomPlugin(PluginBase):
 
         self.backend_sweeper = None
         if self.config['backend_sweeper']['enable']:
-            self.self.backend_sweeper = VideoRoomBackendSweeper(
+            self.backend_sweeper = VideoRoomBackendSweeper(
                 backend_server_mgr=backend_server_mgr,
                 idle_room_check_interval=self.config['backend_sweeper']['backend_idle_room_check_interval']
             )
