@@ -211,7 +211,7 @@ JANUS_VIDEOROOM_P_TYPE_PUBLISHER = 2
 _video_handles = set()
 
 
-def _send_backend_meseage(backend_handle, body, jsep=None):
+def _send_backend_message(backend_handle, body, jsep=None):
     if backend_handle is None:
         raise JanusCloudError('Not connected', JANUS_ERROR_INTERNAL_ERROR)
     data, reply_jsep = backend_handle.send_message(body=body, jsep=jsep)
@@ -353,7 +353,7 @@ class VideoRoomSubscriber(object):
             if temporal_layer >= 0:
                 body['temporal_layer'] = temporal_layer
 
-            reply_data, reply_jsep = _send_backend_meseage(backend_handle, body)
+            reply_data, reply_jsep = _send_backend_message(backend_handle, body)
 
             if reply_jsep:
                 self.sdp = reply_jsep.get('sdp', '')
@@ -402,7 +402,7 @@ class VideoRoomSubscriber(object):
         if temporal_layer:
             body['temporal_layer'] = temporal_layer
 
-        reply_data, reply_jsep = _send_backend_meseage(self._backend_handle, body=body)
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body)
 
         # successful
         if reply_jsep:
@@ -419,7 +419,7 @@ class VideoRoomSubscriber(object):
             raise JanusCloudError('backend handle invalid',
                                   JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
         # backend start
-        _send_backend_meseage(self._backend_handle, body={
+        _send_backend_message(self._backend_handle, body={
             'request': 'start'
         }, jsep=jsep)
 
@@ -430,7 +430,7 @@ class VideoRoomSubscriber(object):
         self._paused = True
         # backend pause
         if self._backend_handle:
-            _send_backend_meseage(self._backend_handle, body={
+            _send_backend_message(self._backend_handle, body={
                 'request': 'pause'
             })
 
@@ -584,7 +584,7 @@ class VideoRoomPublisher(object):
             self._backend_server = None
             # 1. leave the room
             try:
-                _send_backend_meseage(backend_handle, {
+                _send_backend_message(backend_handle, {
                     'request': 'leave',
                 })
             except Exception:
@@ -592,7 +592,7 @@ class VideoRoomPublisher(object):
 
             # 2. destroy backend room
             try:
-                _send_backend_meseage(backend_handle, {
+                _send_backend_message(backend_handle, {
                     'request': 'destroy',
                     'room': backend_room_id
                 })
@@ -668,7 +668,7 @@ class VideoRoomPublisher(object):
             if self.display:
                 body['description'] = 'januscloud-{}'.format(self.display)
 
-            data, reply_jsep = _send_backend_meseage(backend_handle, body)
+            data, reply_jsep = _send_backend_message(backend_handle, body)
             backend_room_id = data.get('room', 0)
             if backend_room_id == 0:
                 raise JanusCloudError('Create backend room fail'.format(self.user_id, self.display),
@@ -683,12 +683,12 @@ class VideoRoomPublisher(object):
             }
             if self.display:
                 body['display'] = self.display
-            _send_backend_meseage(backend_handle, body)
+            _send_backend_message(backend_handle, body)
 
         except Exception:
             if backend_room_id:
                 try:
-                    _send_backend_meseage(backend_handle, {
+                    _send_backend_message(backend_handle, {
                         'request': 'destroy',
                         'room': backend_room_id
                     })
@@ -778,7 +778,7 @@ class VideoRoomPublisher(object):
             body['filename'] = filename
         if display:
             body['display'] = display
-        reply_data, reply_jsep = _send_backend_meseage(self._backend_handle, body=body, jsep=jsep)
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body, jsep=jsep)
 
         # successful
 
@@ -846,7 +846,7 @@ class VideoRoomPublisher(object):
             raise JanusCloudError('Can\'t unpublish, not published',
                                   JANUS_VIDEOROOM_ERROR_NOT_PUBLISHED)
 
-        _send_backend_meseage(self._backend_handle, {
+        _send_backend_message(self._backend_handle, {
             'request': 'unpublish',
         })
 
@@ -1513,7 +1513,7 @@ class VideoRoomBackendSweeper(object):
                     # attach backend handle
                     backend_handle = backend_session.attach_handle(JANUS_VIDEOROOM_PACKAGE)
 
-                reply_data, reply_jsep = _send_backend_meseage(backend_handle, {
+                reply_data, reply_jsep = _send_backend_message(backend_handle, {
                     'request': 'list'
                 })
                 room_list_info = reply_data.get('list', [])
