@@ -2428,6 +2428,12 @@ def get_videoroom_participant_list(request):
         if publisher.webrtc_started and publisher.audiolevel_ext:
             part_info['talking'] = publisher.talking
 
+        server, room_id = publisher.get_backend_server()
+        if server:
+            part_info['backend_server'] = '{} ({})'.format(server.name, server.url)
+        if room_id:
+            part_info['backend_room_id'] = room_id
+
         part_info_list.append(part_info)
 
     return part_info_list
