@@ -45,6 +45,10 @@ def get_plugin(plugin_package_name, default=None):
     return _plugins.get(plugin_package_name, default)
 
 
+def get_plugin_list():
+    return _plugins.values()
+
+
 def register_plugin(plugin_package_name, plugin):
     _plugins[plugin_package_name] = plugin
 

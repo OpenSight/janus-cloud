@@ -9,6 +9,7 @@ from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, StrVal, \
     FloatVal, AutoDel
 from januscloud.proxy.core.frontend_handle_base import JANUS_PLUGIN_OK, JANUS_PLUGIN_OK_WAIT
+from januscloud.proxy.core.plugin_base import get_plugin_list
 
 log = logging.getLogger(__name__)
 
@@ -105,12 +106,9 @@ class Request(object):
 
 class RequestHandler(object):
 
-    def __init__(self, frontend_session_mgr=None, plugin_list=[], proxy_conf={}):
+    def __init__(self, frontend_session_mgr=None, proxy_conf={}):
         self._frontend_session_mgr = frontend_session_mgr
-        self._plugin_list = plugin_list
         self._proxy_conf = proxy_conf
-
-        pass
 
     def _get_session(self, request):
         if request.session_id == 0:
@@ -143,10 +141,15 @@ class RequestHandler(object):
         reply['session-timeout'] = self._proxy_conf.get('general', {}).get('session_timeout', 60)
 
         plugin_info_list = {}
-        for plugin in self._plugin_list:
+        for plugin in get_plugin_list():
             plugin_info = {
-
+                'version_string': plugin.get_version_string(),
+                'description': plugin.get_description(),
+                'author': plugin.get_author(),
+                'name': plugin.get_name(),
+                'version': plugin.get_version(),
             }
+            plugin_info_list[plugin.get_package()] = plugin_info
         reply['plugins'] = plugin_info_list
 
         return reply
