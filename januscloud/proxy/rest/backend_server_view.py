@@ -19,9 +19,9 @@ def get_backend_server_list(request):
 
 
 server_update_schema = Schema({
-    'name': StrVal(min_len=1, max_len=64),
-    'url': StrRe('^\S+$'),
-    'status': EnumVal([JANUS_SERVER_STATUS_NORMAL, JANUS_SERVER_STATUS_ABNORMAL]),
+    'name': StrRe('^\w{1,64}$'),
+    'url': StrRe('^(ws|wss)://\S+$'),
+    'status': IntVal(values=(JANUS_SERVER_STATUS_NORMAL, JANUS_SERVER_STATUS_ABNORMAL)),
     Optional("session_timeout"): IntVal(min=0, max=86400),
     Optional("session_num"): IntVal(min=0, max=10000),
     Optional("handle_num"): IntVal(min=0, max=100000),
