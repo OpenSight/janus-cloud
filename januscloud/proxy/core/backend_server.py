@@ -84,6 +84,9 @@ class BackendServerManager(object):
     def get_valid_server_list(self):
         return BackendServerManager.get_valid_servers(self._server_dao)
 
+    def get_all_server_list(self):
+        return self._server_dao.get_list()
+
     @staticmethod
     def get_valid_servers(server_dao):
         valid_servers = []
