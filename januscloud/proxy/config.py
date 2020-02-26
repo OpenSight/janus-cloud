@@ -49,8 +49,8 @@ config_schema = Schema({
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
     Optional("janus_server"): Default([{
-        "name": StrVal(min_len=1, max_len=64),
-        "url": StrRe('^\S+$'),
+        "name": StrRe('^\w{1,64}$'),
+        "url": StrRe('^(ws|wss)://\S+$'),
         Optional("status"): Default(IntVal(values=(0, 1)), default=0),
         Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=60),
         Optional("session_num"): Default(IntVal(min=0, max=10000), default=0),
