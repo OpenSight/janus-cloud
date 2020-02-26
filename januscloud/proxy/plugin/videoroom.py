@@ -316,7 +316,7 @@ class VideoRoomSubscriber(object):
                                   JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
 
         # backend session
-        backend_session = get_backend_session(backend_server.url, backend_server.session_timeout / 3,
+        backend_session = get_backend_session(backend_server.url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
 
         # attach backend handle
@@ -633,7 +633,7 @@ class VideoRoomPublisher(object):
             raise JanusCloudError('Publisher {} ({})  not in a room '.format(self.user_id, self.display),
                                   JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
         # backend session
-        backend_session = get_backend_session(backend_server.url, backend_server.session_timeout / 3,
+        backend_session = get_backend_session(backend_server.url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
 
         # attach backend handle
@@ -1507,7 +1507,7 @@ class VideoRoomBackendSweeper(object):
             try:
                 if backend_handle is None:
                     # backend session
-                    backend_session = get_backend_session(server.url, server.session_timeout / 3,
+                    backend_session = get_backend_session(server.url,
                                                   auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
 
                     # attach backend handle

@@ -54,7 +54,7 @@ class BackendTransaction(object):
 class BackendSession(object):
     """ This backend session represents a session of the backend Janus server """
 
-    def __init__(self, url, keepalive_interval, auto_destroy=False):
+    def __init__(self, url, auto_destroy=False):
         self.url = url
         self._ws_client = None
         self._transactions = {}
@@ -63,13 +63,16 @@ class BackendSession(object):
         self._handles = {}
         self._auto_destroy = int(auto_destroy)
         self._auto_destroy_greenlet = None
-        self._keepalive_interval = keepalive_interval if keepalive_interval > 0 else 10
+        self._keepalive_interval = 10
         self._keepalive_greenlet = None
         _sessions[url] = self
 
     def init(self):
         try:
             self._ws_client = WSClient(self.url, self._recv_msg_cbk, self._close_cbk, protocols=['janus-protocol'])
+            session_timeout = self._get_session_timeout()
+            if session_timeout:
+                self._keepalive_interval = int(session_timeout / 3)
             self.session_id = self._create_janus_session()
             self.state = BACKEND_SESSION_STATE_ACTIVE
             self._keepalive_greenlet = gevent.spawn(self._keepalive_routine)
@@ -215,6 +218,19 @@ class BackendSession(object):
             tid = str(random_uint64())
         return tid
 
+    def _get_session_timeout(self):
+        response = self.send_request(create_janus_msg('info'))
+        if response['janus'] == 'server_info':
+            return response.get('session-timeout', 30)
+        elif response['janus'] == 'error':
+            raise JanusCloudError(
+                'Create session error for Janus server {} with reason {}'.format(self.url, response['error']['reason']),
+                response['error']['code'])
+        else:
+            raise JanusCloudError(
+                'Create session error for Janus server: {} with invalid response {}'.format(self.url, response),
+                JANUS_ERROR_BAD_GATEWAY)
+
     def _create_janus_session(self):
         response = self.send_request(create_janus_msg('create'))
         if response['janus'] == 'success':
@@ -250,12 +266,12 @@ class BackendSession(object):
 _sessions = {}
 
 
-def get_backend_session(server_url, keepalive_interval=10, auto_destroy=False):
+def get_backend_session(server_url, auto_destroy=False):
     session = _sessions.get(server_url)
     if session is None:
         # create new session
         session = \
-            BackendSession(server_url, keepalive_interval=keepalive_interval, auto_destroy=auto_destroy)
+            BackendSession(server_url, auto_destroy=auto_destroy)
         try:
             session.init()
         except Exception as e:

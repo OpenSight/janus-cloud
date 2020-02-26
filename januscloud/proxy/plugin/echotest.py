@@ -34,7 +34,7 @@ class EchoTestHandle(FrontendHandleBase):
         if server is None:
             raise JanusCloudError('No backend server', JANUS_ERROR_BAD_GATEWAY)
 
-        backend_session = get_backend_session(server.url, server.session_timeout / 3,
+        backend_session = get_backend_session(server.url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
         self.backend_handle = backend_session.attach_handle(JANUS_ECHOTEST_PACKAGE, handle_listener=self)
 

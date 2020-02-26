@@ -154,8 +154,7 @@ class VideoCallHandle(FrontendHandleBase):
                 if candidate:
                     self._pending_candidates.append(candidate)
 
-
-    def handle_incoming_call(self, caller_username, backend_server_url, backend_keepalive_interval):
+    def handle_incoming_call(self, caller_username, backend_server_url):
         if self.videocall_user is None:
             raise JanusCloudError('Register a username first', JANUS_VIDEOCALL_ERROR_REGISTER_FIRST)
         if self.videocall_user.incall:
@@ -164,7 +163,7 @@ class VideoCallHandle(FrontendHandleBase):
         self.videocall_user.peer_name = caller_username
         self.videocall_user.utime = time.time()
         try:
-            self._connect_backend(backend_server_url, backend_keepalive_interval)
+            self._connect_backend(backend_server_url)
             self._plugin.user_dao.update(self.videocall_user)
         except Exception:
             self._disconnect_backend()
@@ -243,9 +242,9 @@ class VideoCallHandle(FrontendHandleBase):
                         self.videocall_user.peer_name = username
                         self.videocall_user.incall = True
                         self.videocall_user.utime = time.time()
-                        self._connect_backend(server.url, server.session_timeout / 3)
+                        self._connect_backend(server.url)
                         self._plugin.call_peer(username, self.videocall_user.username,
-                                               server.url, server.session_timeout / 3)
+                                               server.url)
                         # send call request to backend server
                         result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
                         self._plugin.user_dao.update(self.videocall_user)
@@ -445,14 +444,13 @@ class VideoCallHandle(FrontendHandleBase):
             }
             self._push_plugin_event(hangup_event_data, None, None)
 
-
-    def _connect_backend(self, server_url, keepalive_interval=10):
+    def _connect_backend(self, server_url):
         if self.backend_handle is not None:
                 raise JanusCloudError('Already connected', JANUS_ERROR_INTERNAL_ERROR)
         if self.videocall_user is None:
                 raise JanusCloudError('Register a username first', JANUS_VIDEOCALL_ERROR_REGISTER_FIRST)
 
-        backend_session = get_backend_session(server_url, keepalive_interval,
+        backend_session = get_backend_session(server_url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
         backend_handle = backend_session.attach_handle(JANUS_VIDEOCALL_PACKAGE, handle_listener=self)
 
@@ -557,14 +555,13 @@ class VideoCallPlugin(PluginBase):
     def create_handle(self, handle_id, session, opaque_id=None, *args, **kwargs):
         return VideoCallHandle(handle_id, session, self, opaque_id, *args, **kwargs)
 
-
-    def call_peer(self, peer_username, caller_username, backend_server_url, backend_keepalive_interval):
+    def call_peer(self, peer_username, caller_username, backend_server_url, backend_keepalive_interval=10):
         peer = self.user_dao.get_by_username(peer_username)
         if peer is None:
             raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(peer_username),
                                     JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME)
         if peer.handle:
-            peer.handle.handle_incoming_call(caller_username, backend_server_url, backend_keepalive_interval)
+            peer.handle.handle_incoming_call(caller_username, backend_server_url)
         elif peer.api_url:
             caller = self.user_dao.get_by_username(caller_username)
             if caller is None or caller.handle is None:
