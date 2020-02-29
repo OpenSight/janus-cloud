@@ -2325,7 +2325,7 @@ def post_videoroom_room_list(request):
 def get_videoroom_room(request):
     plugin = request.registry.videoroom_plugin
     room_mgr = plugin.room_mgr
-    room_id = request.matchdict['room_id']
+    room_id = int(request.matchdict['room_id'])
     room = room_mgr.get(room_id)
 
     room_info = {
@@ -2357,7 +2357,7 @@ def get_videoroom_room(request):
 def delete_videoroom_room(request):
     plugin = request.registry.videoroom_plugin
     room_mgr = plugin.room_mgr
-    room_id = request.matchdict['room_id']
+    room_id = int(request.matchdict['room_id'])
     room_base_info = get_params_from_request(request, room_base_schema)
 
     room_mgr.destroy(room_id=room_id,
@@ -2371,7 +2371,7 @@ def delete_videoroom_room(request):
 def get_videoroom_tokens(request):
     plugin = request.registry.videoroom_plugin
     room_mgr = plugin.room_mgr
-    room_id = request.matchdict['room_id']
+    room_id = int(request.matchdict['room_id'])
     room = room_mgr.get(room_id)
     tokens_info = list(room.allowed)
 
@@ -2382,7 +2382,7 @@ def get_videoroom_tokens(request):
 def post_videoroom_tokens(request):
     plugin = request.registry.videoroom_plugin
     room_mgr = plugin.room_mgr
-    room_id = request.matchdict['room_id']
+    room_id = int(request.matchdict['room_id'])
     params = get_params_from_request(request)
     room_base_info = room_base_schema.validate(params)
     allowed_params = allowed_schema.validate(params)
@@ -2412,7 +2412,7 @@ def post_videoroom_tokens(request):
 def get_videoroom_participant_list(request):
     plugin = request.registry.videoroom_plugin
     room_mgr = plugin.room_mgr
-    room_id = request.matchdict['room_id']
+    room_id = int(request.matchdict['room_id'])
     room = room_mgr.get(room_id)
     publisher_list = room.list_participants()
 
@@ -2443,8 +2443,8 @@ def get_videoroom_participant_list(request):
 def delete_videoroom_participant(request):
     plugin = request.registry.videoroom_plugin
     room_mgr = plugin.room_mgr
-    room_id = request.matchdict['room_id']
-    user_id = request.matchdict['user_id']
+    room_id = int(request.matchdict['room_id'])
+    user_id = int(request.matchdict['user_id'])
     room_base_info = get_params_from_request(request, room_base_schema)
     room = room_mgr.get(room_id).check_modify(room_base_info['secret'])
     room.kick_participant(user_id)
