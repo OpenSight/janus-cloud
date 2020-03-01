@@ -706,6 +706,40 @@ class VideoRoomPublisher(object):
         self._assert_valid()
         return self._backend_server, self._backend_room_id
 
+    def _query_backend_simulcast(self):
+        if self._backend_handle is None or self._backend_server is None or self._backend_room_id == 0:
+            return
+        query_handle = None
+        try:
+            # attach backend handle
+            query_handle = get_backend_session(
+                self._backend_server.url,
+                auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME
+            ).attach_handle(JANUS_VIDEOROOM_PACKAGE)
+
+            data, reply_jsep = _send_backend_message(
+                query_handle,
+                {
+                    'request': 'join',
+                    'ptype': 'publisher',
+                    'room': self._backend_room_id,
+                }
+            )
+            publisher_list = data.get('publishers', [])
+            for publisher_info in publisher_list:
+                if publisher_info.get('id', 0) == self.user_id:
+                    self.simulcast = publisher_info.get('simulcast', False)
+                    log.debug('Setting simulcast property: {} (room {}, user {})'.format(
+                            self.simulcast, self.room_id, self.user_id))
+        except Exception as e:
+            log.warning('Get simulcast property (room {}, user {}) from backend failed: {}'.format(
+                            self.room_id, self.user_id, e))
+            pass  # ignore any exception
+        finally:
+            if query_handle:
+                query_handle.detach()
+                query_handle = None
+
     def publish(self, audio=None, video=None, data=None,
                 audiocodec='', videocodec='',
                 bitrate=-1,
@@ -803,15 +837,7 @@ class VideoRoomPublisher(object):
                     self.audiolevel_ext = False
                 log.debug('Setting audiolevel_ext property: {} (room {}, user {})'.format(
                     self.audiolevel_ext, self.room_id, self.user_id))
-            sdp_update = jsep.get('update', False)
-            simulcast = jsep.get('simulcast', None)
-            if not sdp_update:
-                if simulcast is not None and (self.acodec == 'vp8' or self.vcodec == 'h264'):
-                    self.simulcast = True
-                else:
-                    self.simulcast = False
-                log.debug('Setting simulcast property: {} (room {}, user {})'.format(
-                    self.simulcast, self.room_id, self.user_id))
+
         if audio is not None:
             self.audio_active = audio
             log.debug('Setting audio property: {} (room {}, user {})'.format(
@@ -885,6 +911,7 @@ class VideoRoomPublisher(object):
         if self._backend_handle:
             self._backend_handle.send_trickle(candidate=candidate, candidates=candidates)
 
+
     def on_async_event(self, event_msg):
         if self._has_destroyed:
             return
@@ -905,6 +932,9 @@ class VideoRoomPublisher(object):
             if event_msg['janus'] == 'webrtcup':
                 # webrtc pc is up
                 self.webrtc_started = True
+
+                # update simulcast property
+                self._query_backend_simulcast()
 
                 # notify others about publish
                 publisher_info = {
@@ -2419,7 +2449,7 @@ def get_videoroom_participant_list(request):
     part_info_list = []
     for publisher in publisher_list:
         part_info = {
-            'id': publisher.uid,
+            'id': publisher.user_id,
             'publisher': publisher.webrtc_started,
         }
         if publisher.display:
