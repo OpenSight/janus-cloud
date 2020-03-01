@@ -399,7 +399,7 @@ class VideoRoomSubscriber(object):
             body['temporal'] = temporal
         if spatial_layer >= 0:
             body['spatial_layer'] = spatial_layer
-        if temporal_layer:
+        if temporal_layer >=0:
             body['temporal_layer'] = temporal_layer
 
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body)
@@ -468,14 +468,14 @@ class VideoRoomSubscriber(object):
                     self._frontend_handle.push_plugin_event(data, jsep)
             elif op == 'event':
                 reply_event = {}
-                for key, value in data.items:
+                for key, value in data.items():
                     if key in ['substream', 'temporal', 'spatial_layer', 'temporal_layer', 'configured']:
                         reply_event[key] = value
                 if len(reply_event) > 0:
                     reply_event['videoroom'] = 'event'
                     reply_event['room'] = self.room_id
                     if self._frontend_handle:
-                        self._frontend_handle.push_plugin_event(data, jsep)
+                        self._frontend_handle.push_plugin_event(reply_event, jsep)
             else:
                 # ignore other operations
                 pass
