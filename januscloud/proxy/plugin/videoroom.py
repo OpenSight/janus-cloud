@@ -3,6 +3,8 @@ import base64
 import copy
 
 import logging
+import re
+
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg, random_uint64, random_uint32, \
     get_monotonic_time
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST, JANUS_ERROR_INVALID_REQUEST_PATH, \
@@ -526,6 +528,9 @@ class VideoRoomSubscriber(object):
 
 class VideoRoomPublisher(object):
 
+    SIMULCAST_FIREFOX_PATTERN = re.compile('(a=rid:\S+ send)|(a=simulcast)')
+    SIMULCAST_CHROME_PATTERN = re.compile('a=ssrc-group:SIM')
+
     def __init__(self, user_id, handle, display=''):
         self.user_id = user_id     # Unique ID in the room
         self.display = display     # Display name (just for fun)
@@ -706,6 +711,14 @@ class VideoRoomPublisher(object):
         self._assert_valid()
         return self._backend_server, self._backend_room_id
 
+    def _check_sdp_simulcast(self, sdp):
+        # check fro rid (firefox support)
+        if VideoRoomPublisher.SIMULCAST_CHROME_PATTERN.search(sdp):
+            return True
+        if VideoRoomPublisher.SIMULCAST_FIREFOX_PATTERN.search(sdp):
+            return True
+        return False
+
     def _query_backend_simulcast(self):
         if self._backend_handle is None or self._backend_server is None or self._backend_room_id == 0:
             return
@@ -837,6 +850,9 @@ class VideoRoomPublisher(object):
                     self.audiolevel_ext = False
                 log.debug('Setting audiolevel_ext property: {} (room {}, user {})'.format(
                     self.audiolevel_ext, self.room_id, self.user_id))
+                self.simulcast = self._check_sdp_simulcast(sdp)
+                log.debug('Setting simulcast property: {} (room {}, user {})'.format(
+                    self.simulcast, self.room_id, self.user_id))
 
         if audio is not None:
             self.audio_active = audio
@@ -934,7 +950,7 @@ class VideoRoomPublisher(object):
                 self.webrtc_started = True
 
                 # update simulcast property
-                self._query_backend_simulcast()
+                # self._query_backend_simulcast()
 
                 # notify others about publish
                 publisher_info = {
