@@ -528,8 +528,8 @@ class VideoRoomSubscriber(object):
 
 class VideoRoomPublisher(object):
 
-    SIMULCAST_FIREFOX_PATTERN = re.compile('(a=rid:\S+ send)|(a=simulcast)')
-    SIMULCAST_CHROME_PATTERN = re.compile('a=ssrc-group:SIM')
+    SIMULCAST_FIREFOX_PATTERN = re.compile(r'(a=rid:\S+ send)|(a=simulcast)')
+    SIMULCAST_CHROME_PATTERN = re.compile(r'a=ssrc-group:SIM')
 
     def __init__(self, user_id, handle, display=''):
         self.user_id = user_id     # Unique ID in the room
@@ -718,40 +718,6 @@ class VideoRoomPublisher(object):
         if VideoRoomPublisher.SIMULCAST_FIREFOX_PATTERN.search(sdp):
             return True
         return False
-
-    def _query_backend_simulcast(self):
-        if self._backend_handle is None or self._backend_server is None or self._backend_room_id == 0:
-            return
-        query_handle = None
-        try:
-            # attach backend handle
-            query_handle = get_backend_session(
-                self._backend_server.url,
-                auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME
-            ).attach_handle(JANUS_VIDEOROOM_PACKAGE)
-
-            data, reply_jsep = _send_backend_message(
-                query_handle,
-                {
-                    'request': 'join',
-                    'ptype': 'publisher',
-                    'room': self._backend_room_id,
-                }
-            )
-            publisher_list = data.get('publishers', [])
-            for publisher_info in publisher_list:
-                if publisher_info.get('id', 0) == self.user_id:
-                    self.simulcast = publisher_info.get('simulcast', False)
-                    log.debug('Setting simulcast property: {} (room {}, user {})'.format(
-                            self.simulcast, self.room_id, self.user_id))
-        except Exception as e:
-            log.warning('Get simulcast property (room {}, user {}) from backend failed: {}'.format(
-                            self.room_id, self.user_id, e))
-            pass  # ignore any exception
-        finally:
-            if query_handle:
-                query_handle.detach()
-                query_handle = None
 
     def publish(self, audio=None, video=None, data=None,
                 audiocodec='', videocodec='',
@@ -948,9 +914,6 @@ class VideoRoomPublisher(object):
             if event_msg['janus'] == 'webrtcup':
                 # webrtc pc is up
                 self.webrtc_started = True
-
-                # update simulcast property
-                # self._query_backend_simulcast()
 
                 # notify others about publish
                 publisher_info = {
