@@ -65,7 +65,7 @@ def do_main(config):
         # rest api config
         pyramid_config = Configurator()
         pyramid_config.add_renderer(None, JSON(indent=4, check_circular=True, cls=CustomJSONEncoder))
-        pyramid_config.include('januscloud.proxy.rest', route_prefix=config['admin_api']['api_base_path'])
+        pyramid_config.include('januscloud.proxy.rest')
         # TODO register service to pyramid registry
         pyramid_config.registry.backend_server_manager = backend_server_manager
         pyramid_config.registry.proxy_conf = config

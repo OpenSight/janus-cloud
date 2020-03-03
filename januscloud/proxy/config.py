@@ -44,8 +44,7 @@ config_schema = Schema({
     }, default={}),
     Optional("admin_api"): Default({
         Optional("json"): Default(EnumVal(['indented', 'plain', 'compact']), default='indented'),
-        Optional("http_listen"): Default(StrRe('^\S+:\d+$'), default='0.0.0.0:8200'),
-        Optional("api_base_path"): Default(StrVal(), default='/janus-proxy'),
+        Optional("http_listen"): Default(StrRe('^\S+:\d+$'), default='0.0.0.0:8100'),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
     Optional("janus_server"): Default([{

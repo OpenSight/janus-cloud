@@ -8,6 +8,7 @@ import traceback
 import random
 import time
 from .schema import SchemaError
+import socket
 
 class CustomJSONEncoder(json.JSONEncoder):
 
@@ -77,5 +78,20 @@ def get_monotonic_time():
 def random_uint64():
     return random.randint(1, 9007199254740991)
 
+
 def random_uint32():
     return random.randint(1, 2147483647)
+
+
+def get_host_ip():
+    ip = None
+    s = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    finally:
+        if s:
+            s.close()
+
+    return ip

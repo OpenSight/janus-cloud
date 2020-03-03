@@ -75,8 +75,8 @@ ws_transport:
 admin_api:
   json: "indented"                  # Whether the JSON messages should be indented (default),
   # plain (no indentation) or compact (no indentation and no spaces)
-  http_listen: '0.0.0.0:8000'       # REST API server listen addr
-  api_base_path: "/janus-proxy"     # Base path to bind to in the web server (plain HTTP only)
+  http_listen: '0.0.0.0:8100'       # REST API server listen addr
+
 
 # static configured backend Janus-gateway server besides the ones auto-registered by janus-sentinel
 janus_server:
