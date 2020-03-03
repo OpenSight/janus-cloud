@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL
+from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
+    JANUS_SERVER_STATUS_MAINTENANCE
 from januscloud.proxy.rest.common import get_view, post_view, delete_view, get_params_from_request
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
@@ -7,6 +8,7 @@ from januscloud.common.schema import Schema, Optional, DoNotCare, \
 from pyramid.response import Response
 
 def includeme(config):
+    config.add_route('sentinel_callback', '/sentinel_callback')
     config.add_route('backend_server_list', '/backend_servers')
     config.add_route('backend_server', '/backend_servers/{server_name}')
 
@@ -21,7 +23,7 @@ def get_backend_server_list(request):
 server_update_schema = Schema({
     'name': StrRe('^\w{1,64}$'),
     'url': StrRe('^(ws|wss)://\S+$'),
-    'status': IntVal(values=(JANUS_SERVER_STATUS_NORMAL, JANUS_SERVER_STATUS_ABNORMAL)),
+    'status': IntVal(values=(JANUS_SERVER_STATUS_NORMAL, JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_MAINTENANCE)),
     Optional("session_timeout"): IntVal(min=0, max=86400),
     Optional("session_num"): IntVal(min=0, max=10000),
     Optional("handle_num"): IntVal(min=0, max=100000),
@@ -30,6 +32,14 @@ server_update_schema = Schema({
     Optional("expire"): IntVal(min=0, max=86400),
     AutoDel(str): object  # for all other key we must delete
 })
+
+
+@post_view(route_name='sentinel_callback')
+def post_sentinel_callback(request):
+    params = get_params_from_request(request, server_update_schema)
+    backend_server_manager = request.registry.backend_server_manager
+    backend_server_manager.update_server(**params)
+    return Response(status=200)
 
 
 @post_view(route_name='backend_server_list')

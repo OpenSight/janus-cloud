@@ -11,12 +11,14 @@ log = logging.getLogger(__name__)
 
 JANUS_SERVER_STATUS_NORMAL = 0
 JANUS_SERVER_STATUS_ABNORMAL = 1
+JANUS_SERVER_STATUS_MAINTENANCE = 2
 
 
 class BackendServer(object):
     """ This backend session represents a session of the backend Janus server """
 
-    def __init__(self, name, url, status, session_timeout=0, location='', isp='', session_num=0, handle_num=0, expire=60):
+    def __init__(self, name, url, status, session_timeout=0,
+                 location='', isp='', session_num=0, handle_num=0, expire=60, start_time=0):
         self.name = name
         self.url = url
         self.status = status
@@ -26,6 +28,7 @@ class BackendServer(object):
         self.session_num = session_num
         self.handle_num = handle_num
         self.expire = expire
+        self.start_time = start_time
         self.utime = time.time()
         self.ctime = time.time()
 
