@@ -1514,13 +1514,11 @@ class VideoRoomBackendSweeper(object):
             if gevent.getcurrent() != self._idle_room_check_greenlets.get(server.name):
                 break
             try:
-                if backend_handle is None:
-                    # backend session
-                    backend_session = get_backend_session(server.url,
-                                                  auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
-
-                    # attach backend handle
-                    backend_handle = backend_session.attach_handle(JANUS_VIDEOROOM_PACKAGE)
+                # create backend handle
+                backend_handle = get_backend_session(
+                    server.url,
+                    auto_destroy=self._idle_room_check_interval * 2
+                ).attach_handle(JANUS_VIDEOROOM_PACKAGE)
 
                 reply_data, reply_jsep = _send_backend_message(backend_handle, {
                     'request': 'list'
@@ -1537,10 +1535,10 @@ class VideoRoomBackendSweeper(object):
                         continue   # pass not januscloud-created room
 
                     # this is a idle room
-                    # log.debug('found idle room {}, last_idle_rooms: {}, idle_rooms:{}'.format(room_id, last_idle_rooms, idle_rooms))
                     if room_id in last_idle_rooms:
                         # auto destroy the idle room
-                        log.warning('Sweeper found the backend idle room {} for server {}, destroy it'.format(room_id, server.url))
+                        log.warning('Sweeper found the backend idle room {} for server {}, destroy it'.format(
+                            room_id, server.url))
                         backend_handle.send_message({
                             'request': 'destroy',
                             'room': room_id
@@ -1552,6 +1550,7 @@ class VideoRoomBackendSweeper(object):
                 # pass the exception
                 log.debug('Videoroom backend sweeper failed on server {}: {}. Retry in {} secs'.format(
                     server.url, str(e), self._idle_room_check_interval))
+            finally:
                 if backend_handle:
                     backend_handle.detach()
                 backend_handle = None
