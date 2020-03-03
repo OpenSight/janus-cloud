@@ -49,5 +49,6 @@ setup(name='janus-cloud',
       entry_points="""
       [console_scripts]
       janus-proxy = januscloud.proxy.main:main
+      janus-sentinel = januscloud.sentinel.main:main
       """,
       )
