@@ -206,6 +206,8 @@ class JanusServer(object):
     def on_process_status_change(self, watcher):
         if watcher.process_status == PROC_RUNNING:
             self.start_time = time.time()
+        else:
+            self.start_time = 0
 
 if __name__ == '__main__':
     pass
