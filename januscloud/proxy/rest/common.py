@@ -101,6 +101,7 @@ def error_view(exc, request):
     log.error('Error handling request\n{0}\n{1}'.format(str(exc), ' '.join(tb_list)))
     return {'info': str(exc), 'exception': str(typ), 'traceback': tb_list}
 
+
 @view_config(context=pyramid.exceptions.NotFound)
 def not_found_view(exc, request):
     response = request.response
@@ -119,6 +120,7 @@ def forbidden_view(exc, request):
     return {'info': 'Resource {0} for method {1} is Forbidden'.format(request.path, request.method),
             'exception': str(type),
             'traceback': []}
+
 
 @subscriber(NewResponse)
 def add_response_header(event):

@@ -22,6 +22,8 @@ class JanusServer(object):
     def __init__(self, server_name, server_ip, ws_port, admin_ws_port=0,
                  pingpong_interval=5, statistic_interval=10, request_timeout=10):
         self.server_name = server_name
+        if self.server_name is None or self.server_name == '':
+            self.server_name = 'server_{}'.format(random_uint64())
         self.server_local_ip = server_ip
         self.server_public_ip = server_ip
         if server_ip == '127.0.0.1':
