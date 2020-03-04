@@ -112,7 +112,8 @@ class JanusServer(object):
         try:
             if self._ws_client is None:
                 self._ws_client = WSClient(self.url,
-                                           self._recv_msg_cbk, self._close_cbk(), protocols=['janus-protocol'])
+                                           self._recv_msg_cbk, self._close_cbk, protocols=['janus-protocol'])
+                
 
             self.send_request(self._ws_client, create_janus_msg('ping'), )
 
@@ -204,6 +205,7 @@ class JanusServer(object):
             self.update_statics()
 
     def on_process_status_change(self, watcher):
+        log.debug('on_process_status_change is called')
         if watcher.process_status == PROC_RUNNING:
             self.start_time = time.time()
         else:

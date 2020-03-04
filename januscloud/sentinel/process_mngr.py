@@ -16,7 +16,7 @@ from gevent import subprocess, sleep
 import sys
 import os
 import time
-from .exceptions import StreamSwitchError
+from januscloud.common.error import JanusCloudError
 import weakref
 import traceback
 
@@ -244,7 +244,7 @@ class ProcWatcher(object):
 
         if self._popen is not None:
             # other greenlet is stopping this watcher
-            raise StreamSwitchError("ProcWatcher (%d) in Stopping" % self.wid, 500)
+            raise JanusCloudError("ProcWatcher (%d) in Stopping" % self.wid, 500)
 
         try:
             self._launch_process()   # start up the process
