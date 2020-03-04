@@ -88,7 +88,7 @@ def do_main(config):
         if janus_watcher:
             janus_watcher.start()
 
-        log.info('Started Janus Sentinel')
+        log.info('Janus Sentinel Started')
 
         def stop_sentinel():
             log.info('Janus Proxy receives signals to quit...')

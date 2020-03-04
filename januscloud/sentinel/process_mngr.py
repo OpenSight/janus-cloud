@@ -67,10 +67,7 @@ class ProcWatcher(object):
         self._error_restart_interval = float(error_restart_interval)
         self._popen = None
         self._started = False
-        if process_status_cb is not None:
-            self._process_status_cb_weakref = weakref.ref(process_status_cb)
-        else:
-            self._process_status_cb_weakref = None
+        self._process_status_cb = process_status_cb
         self._poll_greenlet = None
         self._poll_interval = poll_interval
         self._has_aged = False
@@ -127,10 +124,9 @@ class ProcWatcher(object):
 
     def _on_process_status_change(self):
         try:
-            if self._process_status_cb_weakref is not None:
-                cb = self._process_status_cb_weakref()
-                if cb is not None and callable(cb):
-                    cb(self)
+            cb = self._process_status_cb
+            if cb is not None and callable(cb):
+                cb(self)
         except Exception:
             pass
 
@@ -344,6 +340,7 @@ class ProcWatcher(object):
     
     def destroy(self):
         self.async_stop(DEFAULT_STOP_WAIT_TIMEOUT)
+        self._process_status_cb = None  # release ref of the callback
 
 
 def spawn_watcher(*args, **kwargs):
