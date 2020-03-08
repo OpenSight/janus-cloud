@@ -32,7 +32,7 @@ class JanusServer(object):
         self.session_num = 0
         self.handle_num = 0
         self.start_time = 0
-        self.state = JANUS_SERVER_STATUS_ABNORMAL
+        self.status = JANUS_SERVER_STATUS_ABNORMAL
         self._in_maintenance = False
         self._admin_ws_port = admin_ws_port
         self._ws_client = None
@@ -67,12 +67,11 @@ class JanusServer(object):
                 pass
             self._admin_ws_client = None
 
-        self._proc_watcher = None
         self._poll_greenlet = None
         self._statistic_greenlet = None
         self.session_num = 0
         self.handle_num = 0
-        self.state = JANUS_SERVER_STATUS_ABNORMAL
+        self.status = JANUS_SERVER_STATUS_ABNORMAL
 
     @property
     def url(self):
@@ -86,14 +85,15 @@ class JanusServer(object):
     def public_url(self):
         return 'ws://{}:{}'.format(self.server_public_ip, self.ws_port)
 
-    def update_state(self, new_state):
+    def update_status(self, new_status):
         if self._in_maintenance:
             return  # ignore state change when maintaining
-        old_state = self.state
-        self.state = new_state
-        if old_state != new_state:
+        old_status = self.status
+        self.status = new_status
+        if old_status != new_status:
+            log.info('janus server({}) status changed to {}'.format(self.url, new_status))
             for cb in self._state_change_cbs:
-                cb(new_state)
+                cb(new_status)
 
     def register_state_change_callback(self, cb):
         self._state_change_cbs.append(cb)
@@ -101,29 +101,28 @@ class JanusServer(object):
     def start_maintenance(self):
         if self._in_maintenance:
             return    # already under maintenance
-        self.update_state(JANUS_SERVER_STATUS_MAINTENANCE)
+        self.update_status(JANUS_SERVER_STATUS_MAINTENANCE)
         self._in_maintenance = True
 
     def stop_maintenance(self):
         if not self._in_maintenance:
             return
         self._in_maintenance = False
-        self.update_state(JANUS_SERVER_STATUS_ABNORMAL)
+        self.update_status(JANUS_SERVER_STATUS_ABNORMAL)
 
     def pingpong(self):
         try:
             if self._ws_client is None:
                 self._ws_client = WSClient(self.url,
                                            self._recv_msg_cbk, self._close_cbk, protocols=['janus-protocol'])
-                
 
             self.send_request(self._ws_client, create_janus_msg('ping'), )
 
-            self.update_state(JANUS_SERVER_STATUS_NORMAL)
+            self.update_status(JANUS_SERVER_STATUS_NORMAL)
 
         except Exception as e:
             log.warning('Poll janus server({}) failed: {}'.format(self.url, e))
-            self.update_state(JANUS_SERVER_STATUS_ABNORMAL)
+            self.update_status(JANUS_SERVER_STATUS_ABNORMAL)
             if self._ws_client:
                 try:
                     self._ws_client.close()
@@ -131,7 +130,7 @@ class JanusServer(object):
                     pass
                 self._ws_client = None
 
-    def update_statics(self):
+    def update_statistics(self):
         try:
             if self._admin_ws_client is None:
                 self._admin_ws_client = WSClient(self.admin_url, self._recv_msg_cbk, None, protocols=['janus-admin-protocol'])
@@ -173,7 +172,7 @@ class JanusServer(object):
         if self._has_destroy:
             return
         log.info('WebSocket closed for Janus server {} '.format(self.url))
-        self.update_state(JANUS_SERVER_STATUS_ABNORMAL)
+        self.update_status(JANUS_SERVER_STATUS_ABNORMAL)
 
     def _recv_msg_cbk(self, msg):
         try:
@@ -204,7 +203,7 @@ class JanusServer(object):
             gevent.sleep(self._statistic_interval)
             if self._has_destroy:
                 break
-            self.update_statics()
+            self.update_statistics()
 
     def on_process_status_change(self, watcher):
         log.debug('on_process_status_change is called, new status: {}'.format(watcher.process_status))
@@ -212,6 +211,7 @@ class JanusServer(object):
             self.start_time = time.time()
         else:
             self.start_time = 0
+
 
 if __name__ == '__main__':
     pass
