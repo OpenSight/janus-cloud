@@ -207,7 +207,7 @@ class JanusServer(object):
             self.update_statics()
 
     def on_process_status_change(self, watcher):
-        log.debug('on_process_status_change is called')
+        log.debug('on_process_status_change is called, new status: {}'.format(watcher.process_status))
         if watcher.process_status == PROC_RUNNING:
             self.start_time = time.time()
         else:

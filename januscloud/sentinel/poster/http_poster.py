@@ -48,7 +48,7 @@ class HttpPoster(BasicPoster):
                 r = requests.post(url, data={
                     'name': self._janus_server.server_name,
                     'url': self._janus_server.public_url,
-                    'status': self._janus_server.public_url,
+                    'status': self._janus_server.state,
                     'session_num': self._janus_server.session_num,
                     'handle_num': self._janus_server.handle_num,
                     'start_time': self._janus_server.start_time,
@@ -57,7 +57,9 @@ class HttpPoster(BasicPoster):
                 if r.status_code == requests.codes.ok:
                     return True
                 else:
-                    raise JanusCloudError('HTTP Return error (Status code: {}'.format(r.status_code), r.status_code)
+                    raise JanusCloudError('HTTP Return error (Status code: {}, text: {})'.format(
+                        r.status_code, r.text), r.status_code)
+
             except Exception as e:
                 log.warning('Http post failed for url {}: {}'.format(url, e))
                 pass
