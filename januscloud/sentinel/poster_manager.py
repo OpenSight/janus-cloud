@@ -43,8 +43,9 @@ def add_poster(janus_server, post_type, name='', *args, **kwargs):
     if poster_class is None:
         raise JanusCloudError('poster type {} not register'.format(post_type),
                               JANUS_ERROR_NOT_IMPLEMENTED)
-    return poster_class(janus_server, post_type, name, *args, **kwargs)
-
+    poster = poster_class(janus_server, post_type, name, *args, **kwargs)
+    _posters.append(poster)
+    return poster
 
 def list_posters():
     return list(_posters)
