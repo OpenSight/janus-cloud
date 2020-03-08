@@ -27,7 +27,7 @@ janus:
   statistic_interval: 10                # how oftern the Sentinel acquire the statistic data by admin API from the
                                         # monitor janus server, default is 10 secs
 
-  request_timout: 10                    # how long to wait for reply from the monitored janus server, default is 10 secs
+  request_timeout: 10                   # how long to wait for reply from the monitored janus server, default is 10 secs
 
 proc_watcher:
   cmdline: ""                           # command line to start up janus-server. default is empty, means not enable

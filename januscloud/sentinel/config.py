@@ -20,13 +20,13 @@ config_schema = Schema({
         AutoDel(str): object  # for all other key remove
     }, default={}),
     Optional("janus"): Default({
-        Optional("server_name"): Default(StrVal(min_len=1, max_len=64), default=''),
+        Optional("server_name"): Default(StrVal(min_len=0, max_len=64), default=''),
         Optional("server_ip"): Default(StrVal(), default='127.0.0.1'),
         Optional("ws_port"): Default(IntVal(min=0, max=65536), default=8188),
         Optional("admin_ws_port"): Default(IntVal(min=0, max=65536), default=0),
         Optional("pingpong_interval"): Default(IntVal(min=1, max=3600), default=5),
         Optional("statistic_interval"): Default(IntVal(min=1, max=3600), default=10),
-        Optional("request_timout"): Default(IntVal(min=1, max=3600), default=10),
+        Optional("request_timeout"): Default(IntVal(min=1, max=3600), default=10),
         AutoDel(str): object  # for all other key remove
     }, default={}),
 
