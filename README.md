@@ -10,7 +10,7 @@ Why Janus-cloud
 
 Janus is an excellent WebRTC server, simple and well-structured. Its pluggable design and sophisticated API is impressive and amazing. But it also comes with some disadvantage.
 First, Janus is design to be a standalone server, which cannot be scale to support the huge RTC workload. But in the cloud-based environment, scalability is essential. With the help of Janus-cloud, engineers can easily build a large and scalable cluster system of WebRTC server. 
-Second, Janus processes the WebRTC signalling, as well as the media data. But in the real Communication world, signalling and media are usually divided into two plane, so that more flexibility can be provided. Janus-cloud fulfills this requirement by handling the signalling only and leaving media to Janus-server. Janus-cloud is developed by Python3 language which is more suitable to deal with the signalling, in the other hand, C language, which is used by Janus server, is more suitable to transmit media data in an efficient way . 
+Second, Janus processes the WebRTC signalling, as well as the media data. But in the real communication world, signalling and media are usually divided into two plane, so that more flexibility can be provided. Janus-cloud fulfills this requirement by handling the signalling only and leaving media to Janus-server. Janus-cloud is developed by Python3 language which is more suitable to deal with the signalling, in the other hand, C language, which is used by Janus server, is more suitable to transmit media data in an efficient way . 
 
 
 Features
@@ -19,6 +19,19 @@ Features
 * Scalable, Janus media servers can be added/removed to/from the cluster dynamically
 * Support Janus media service self-register, service monitor, circuit breaker
 * Pluggable, support the new features through developing the new plugin
+* the Same API with the Janus server, which is compatible with the original client of the Janus server
+
+Components
+-------------------
+
+Janus-cloud contains two main components, Janus-proxy and Janus-sentinel, which are responsible for two different functions.
+
+### Janus-proxy
+
+Janus-proxy is responsible for signal handling, which 
+
+### Janus-sentinel
+
 
 
 

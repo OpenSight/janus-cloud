@@ -55,9 +55,10 @@ admin_api:
   http_listen: '0.0.0.0:8200'       # REST API server listen addr
 
 
-poster:
+posters:
   -
-    type: 'http'                                            # state poster type/protocl, only support 'http' by now
+    post_type: 'http'                                       # state poster type/protocl, only support 'http' by now
+    name: ''
     post_urls: ["http://127.0.0.1:8100/sentinel_callback"]  # http url to post the current state, if there are multi urls,
                                                             # this poster would post to each by round robin mode
     expire: 60                                              # thee expire time for each post. The poster would post the latest
