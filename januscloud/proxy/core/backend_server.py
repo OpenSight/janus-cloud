@@ -73,7 +73,6 @@ class BackendServerManager(object):
             server.status = status
             for (k, v) in kwargs.items():
                 if k in ("session_timeout", "location", "isp", "session_num", "handle_num", "expire"):
-
                     setattr(server, k, v)
             server.utime = time.time()
             self._server_dao.update(server)

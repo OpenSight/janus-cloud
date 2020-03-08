@@ -48,7 +48,7 @@ class HttpPoster(BasicPoster):
                 r = requests.post(url, data={
                     'name': self._janus_server.server_name,
                     'url': self._janus_server.public_url,
-                    'status': self._janus_server.state,
+                    'status': self._janus_server.status,
                     'session_num': self._janus_server.session_num,
                     'handle_num': self._janus_server.handle_num,
                     'start_time': self._janus_server.start_time,
