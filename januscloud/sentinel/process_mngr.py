@@ -19,6 +19,9 @@ import time
 from januscloud.common.error import JanusCloudError
 import weakref
 import traceback
+import logging
+
+log = logging.getLogger(__name__)
 
 PROC_STOP = 0
 PROC_RUNNING = 1
@@ -107,13 +110,13 @@ class ProcWatcher(object):
                                        stderr=DEVNULL,
                                        close_fds=True,
                                        shell=False)
-        # print("lanch new process %s, pid:%d" % (self.args, self._popen.pid))
+        log.debug("lanch new process %s, pid:%d" % (self.args, self._popen.pid))
         self._has_aged = False
         self._proc_start_time = time.time()
         self._on_process_status_change()
 
     def _on_process_terminate(self, ret):
-        # print("process pid:%d terminated with returncode:%d" % (self._popen.pid, ret))
+        log.warning("process pid:%d terminated with returncode:%d" % (self._popen.pid, ret))
         self._popen = None
         self.process_return_code = ret
         self.process_exit_time = time.time()
@@ -179,9 +182,8 @@ class ProcWatcher(object):
                                         watcher._popen.terminate()
                                     except OSError:
                                         pass
-            except Exception:
-                print("process polling greenlet receives the below Exception when running, ignored")
-                traceback.print_exc()
+            except Exception as e:
+                log.exception("process polling greenlet receives the below Exception when running, ignored")
                 pass
             del watcher
             sleep(sleep_time)      # next time to check
