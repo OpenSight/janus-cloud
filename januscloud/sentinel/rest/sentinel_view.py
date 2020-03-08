@@ -28,7 +28,7 @@ def get_sentinel_info(request):
             'server_url': janus_server.url,
             'server_public_url': janus_server.public_url,
             'server_admin_url': janus_server.admin_url,
-            'state': janus_server.state,
+            'state': janus_server.status,
             'session_num': janus_server.session_num,
             'handle_num': janus_server.handle_num,
             'start_time': str(datetime.datetime.fromtimestamp(janus_server.start_time)),
