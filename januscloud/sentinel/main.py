@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 import gevent.monkey
-
-
-
 gevent.monkey.patch_all()
+
 import sys
 from januscloud.sentinel.config import load_conf
 from daemon import DaemonContext
@@ -39,9 +37,8 @@ def do_main(config):
     from januscloud.common.logger import set_root_logger
     from januscloud.sentinel.process_mngr import ProcWatcher
     from januscloud.sentinel.janus_server import JanusServer
-    from januscloud.transport.ws import WSServer
-    import importlib
-    from januscloud.common.error import JanusCloudError, JANUS_ERROR_NOT_IMPLEMENTED
+    from januscloud.sentinel.poster_manager import add_poster
+    from januscloud.sentinel.poster.http_poster import HttpPoster
 
     set_root_logger(**(config['log']))
 
@@ -68,6 +65,8 @@ def do_main(config):
                                         poll_interval=config['proc_watcher']['poll_interval'],
                                         process_status_cb=janus_server.on_process_status_change)
 
+        for poster_params in config['posters']:
+            add_poster(janus_server, **poster_params)
 
         # rest api config
         pyramid_config = Configurator()
@@ -107,7 +106,7 @@ def do_main(config):
 
         # stop janus watcher
         if janus_watcher:
-            janus_watcher.async_stop()
+            janus_watcher.destroy()
             janus_watcher = None
 
         log.info("Janus-sentinel Quit")
@@ -115,7 +114,7 @@ def do_main(config):
     except Exception:
         log.exception('Failed to start Janus Sentinel')
         if janus_watcher:
-            janus_watcher.async_stop()
+            janus_watcher.destroy()
             janus_watcher = None
 
 

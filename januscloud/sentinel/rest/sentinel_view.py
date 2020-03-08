@@ -9,10 +9,13 @@ from januscloud.common.schema import Schema, Optional, DoNotCare, \
     FloatVal, AutoDel, StrVal, EnumVal
 from pyramid.response import Response
 
+from januscloud.sentinel.poster_manager import list_posters
+
 
 def includeme(config):
     config.add_route('sentinel_info', '/sentinel/info')
     config.add_route('sentinel_op', '/sentinel/op')
+    config.add_route('posters', '/sentinel/posters')
 
 
 @get_view(route_name='sentinel_info')
@@ -30,7 +33,7 @@ def get_sentinel_info(request):
             'handle_num': janus_server.handle_num,
             'start_time': str(datetime.datetime.fromtimestamp(janus_server.start_time)),
 
-        }
+        },
     }
     if janus_watcher:
         info['janus_watcher'] = {
@@ -42,6 +45,7 @@ def get_sentinel_info(request):
             'last_exit_time': str(datetime.datetime.fromtimestamp(janus_watcher.process_exit_time)),
             'last_return_code': janus_watcher.process_return_code,
         }
+
     return info
 
 
@@ -70,3 +74,9 @@ def post_sentinel_op(request):
         raise JanusCloudError('Not implement for op {}'.format(params['op']),
                                JANUS_ERROR_NOT_IMPLEMENTED)
     return Response(status=200)
+
+
+@get_view(route_name='posters')
+def get_posters(request):
+    poster_list = list_posters()
+    return poster_list

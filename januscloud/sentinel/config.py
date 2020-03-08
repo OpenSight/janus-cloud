@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+from januscloud.common.error import JanusCloudError, JANUS_ERROR_NOT_IMPLEMENTED
 from januscloud.common.schema import Schema, StrVal, Default, AutoDel, Optional, BoolVal, IntVal, \
     StrRe, EnumVal, Or, DoNotCare
 from januscloud.common.confparser import parse as parse_config
@@ -9,7 +9,6 @@ import os
 config_schema = Schema({
     Optional("general"): Default({
         Optional("daemonize"): Default(BoolVal(), default=False),
-
         AutoDel(str): object  # for all other key remove
     }, default={}),
     Optional("log"): Default({
@@ -42,10 +41,19 @@ config_schema = Schema({
         Optional("http_listen"): Default(StrRe('^\S+:\d+$'), default='0.0.0.0:8200'),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
-    Optional("poster"): Default([{
-        "type": StrVal(min_len=1, max_len=64),
+    Optional("posters"): Default([{
+        "post_type": StrVal(min_len=1, max_len=64),
+        "name": StrVal(min_len=0, max_len=64),
         DoNotCare(str): object  # for all other key we don't care
     }], default=[]),
+})
+http_poster_schema = Schema({
+    "post_type": StrVal(min_len=1, max_len=64),
+    "name": StrVal(min_len=0, max_len=64),
+    "post_urls": [StrRe(r'(http|https)://')],
+    Optional("expire"): Default(IntVal(min=1, max=3600), default=60),
+    Optional("http_timeout"): Default(IntVal(min=1, max=3600), default=10),
+    AutoDel(str): object  # for all other key, remove
 })
 
 
@@ -54,6 +62,13 @@ def load_conf(path):
         config = config_schema.validate({})
     else:
         config = parse_config(path, config_schema)
+
+    for i in range(len(config['posters'])):
+        if config['posters'][i]['post_type'] == 'http':
+            config['posters'][i] = http_poster_schema.validate(config['posters'][i])
+        else:
+            raise JanusCloudError('poster_type {} not support'.format(config['posters'][i]['post_type']),
+                                  JANUS_ERROR_NOT_IMPLEMENTED)
 
     # check other configure option is valid or not
     # TODO
