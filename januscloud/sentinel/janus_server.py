@@ -47,6 +47,7 @@ class JanusServer(object):
         self._statistic_interval = statistic_interval
         self._request_timeout = request_timeout
         self._state_change_cbs = []
+        self._listeners = []
 
     def destroy(self):
         if self._has_destroy:
@@ -72,6 +73,7 @@ class JanusServer(object):
         self.session_num = 0
         self.handle_num = 0
         self.status = JANUS_SERVER_STATUS_ABNORMAL
+        self._listeners.clear()
 
     @property
     def url(self):
@@ -92,11 +94,21 @@ class JanusServer(object):
         self.status = new_status
         if old_status != new_status:
             log.info('janus server({}) status changed to {}'.format(self.url, new_status))
-            for cb in self._state_change_cbs:
-                cb(new_status)
+            for listener in self._listeners:
+                if hasattr(listener, 'on_status_changed') and callable(listener.on_status_changed):
+                    listener.on_status_changed(new_status)
 
-    def register_state_change_callback(self, cb):
-        self._state_change_cbs.append(cb)
+    def update_stat(self, session_num, handle_num):
+        self.session_num = session_num
+        self.handle_num = handle_num
+        log.info('janus server({}) update session_num:{}, handle_num: {}'.format(
+            self.url, self.session_num, self.handle_num))
+        for listener in self._listeners:
+            if hasattr(listener, 'on_stat_updated') and callable(listener.on_stat_updated):
+                listener.on_stat_updated()
+
+    def register_listener(self, listener):
+        self._listeners.append(listener)
 
     def start_maintenance(self):
         if self._in_maintenance:
@@ -130,7 +142,7 @@ class JanusServer(object):
                     pass
                 self._ws_client = None
 
-    def update_statistics(self):
+    def query_stat(self):
         try:
             if self._admin_ws_client is None:
                 self._admin_ws_client = WSClient(self.admin_url, self._recv_msg_cbk, None, protocols=['janus-admin-protocol'])
@@ -142,7 +154,7 @@ class JanusServer(object):
                     self._admin_ws_client.close()
                 except Exception:
                     pass
-                self._ws_client = None
+                self._admin_ws_client = None
 
     def send_request(self, client, msg, ignore_ack=True):
 
@@ -203,7 +215,7 @@ class JanusServer(object):
             gevent.sleep(self._statistic_interval)
             if self._has_destroy:
                 break
-            self.update_statistics()
+            self.query_stat()
 
     def on_process_status_change(self, watcher):
         log.debug('on_process_status_change is called, new status: {}'.format(watcher.process_status))
