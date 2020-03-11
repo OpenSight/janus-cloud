@@ -16,16 +16,17 @@ requires = [
 
 
 setup(name='janus-cloud',
-      version='0.1.0',
+      version='0.2.0',
       license='AGPLv3',
       url='https://github.com/OpenSight/janus-cloud',
-      description='Janus-cloud is an JANUS API proxy to deploy the Janus WebRTC server cluster',
+      description='Janus-cloud is an JANUS API proxy to implement the Janus WebRTC server cluster',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
           "Development Status :: 4 - Beta",
           "Framework :: Pyramid",
           "Intended Audience :: System Administrators",
           "Intended Audience :: Developers",
+          "Intended Audience :: Janus user",
           "License :: OSI Approved :: GNU Affero General Public License v3",
           "Operating System :: POSIX :: Linux",
           "Programming Language :: Python",
@@ -50,5 +51,6 @@ setup(name='janus-cloud',
       [console_scripts]
       janus-proxy = januscloud.proxy.main:main
       janus-sentinel = januscloud.sentinel.main:main
+      janus-install-conf = januscloud.console:install_conf
       """,
       )
