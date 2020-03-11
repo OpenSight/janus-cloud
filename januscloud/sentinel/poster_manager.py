@@ -23,11 +23,13 @@ class BasicPoster(object):
         self._janus_server = janus_server
         self.name = name
         self.connected = False
-        janus_server.register_state_change_callback(self.on_state_changed)
+        janus_server.register_listener(self)
 
-    def on_state_changed(self, new_state):
+    def on_status_changed(self, new_state):
         pass
 
+    def on_stat_updated(self):
+        pass
 
 _poster_types = {}
 
@@ -46,6 +48,7 @@ def add_poster(janus_server, post_type, name='', *args, **kwargs):
     poster = poster_class(janus_server, post_type, name, *args, **kwargs)
     _posters.append(poster)
     return poster
+
 
 def list_posters():
     return list(_posters)

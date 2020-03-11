@@ -28,6 +28,7 @@ class HttpPoster(BasicPoster):
             self._post_interval = self.expire / 3
         self._state_changed_event = Event()
         self._cur_index = 0
+        self._stat_updated = False
 
     def _post_routine(self):
         while True:
@@ -35,25 +36,33 @@ class HttpPoster(BasicPoster):
             self._state_changed_event.clear()
             self.connected = self.post()
 
-    def on_state_changed(self, new_state):
+    def on_status_changed(self, new_state):
+        self._state_changed_event.set()
+
+    def on_stat_updated(self):
+        self._stat_updated = True
         self._state_changed_event.set()
 
     def post(self):
+        data = {
+            'name': self._janus_server.server_name,
+            'url': self._janus_server.public_url,
+            'status': self._janus_server.status,
+            'start_time': self._janus_server.start_time,
+            'expire': self.expire,
+        }
+        if self._stat_updated:
+            data['session_num'] = self._janus_server.session_num
+            data['handle_num'] = self._janus_server.handle_num,
+        self._stat_updated = False
+
         for i in range(len(self.post_urls)):
             url = self.post_urls[self._cur_index]
             self._cur_index += 1
             if self._cur_index >= len(self.post_urls):
                 self._cur_index = 0
             try:
-                r = requests.post(url, data={
-                    'name': self._janus_server.server_name,
-                    'url': self._janus_server.public_url,
-                    'status': self._janus_server.status,
-                    'session_num': self._janus_server.session_num,
-                    'handle_num': self._janus_server.handle_num,
-                    'start_time': self._janus_server.start_time,
-                    'expire': self.expire,
-                }, timeout=self._http_timeout)
+                r = requests.post(url,  data=data, timeout=self._http_timeout)
                 if r.status_code == requests.codes.ok:
                     return True
                 else:
