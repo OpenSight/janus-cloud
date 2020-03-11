@@ -22,7 +22,7 @@ class HttpPoster(BasicPoster):
         self.post_urls = post_urls
         self.expire = expire
         self._http_timeout = http_timeout
-        self._post_greenlet = gevent.spawn(self._post_interval)
+        self._post_greenlet = gevent.spawn(self._post_routine)
         self._post_interval = HttpPoster.MAX_POST_INTERVAL
         if expire and (expire / 3) < self._post_interval:
             self._post_interval = self.expire / 3
