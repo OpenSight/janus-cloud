@@ -30,6 +30,7 @@ def main():
 def do_main(config):
 
     import signal
+    import shlex
     from gevent.pywsgi import WSGIServer
     from pyramid.config import Configurator
     from pyramid.renderers import JSON
@@ -60,7 +61,7 @@ def do_main(config):
 
         # set up janus_watcher
         if config['proc_watcher']['cmdline']:
-            janus_watcher = ProcWatcher(args=config['proc_watcher']['cmdline'],
+            janus_watcher = ProcWatcher(args=shlex.split(config['proc_watcher']['cmdline']),
                                         error_restart_interval=config['proc_watcher']['error_restart_interval'],
                                         poll_interval=config['proc_watcher']['poll_interval'],
                                         process_status_cb=janus_server.on_process_status_change)
