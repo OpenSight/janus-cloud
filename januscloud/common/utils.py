@@ -72,7 +72,7 @@ def error_to_janus_msg(session_id=0, transaction=None, exception=None):
 
 
 def get_monotonic_time():
-    return time.clock_gettime(time.CLOCK_MONOTONIC)
+    return time.monotonic()
 
 
 def random_uint64():

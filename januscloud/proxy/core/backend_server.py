@@ -12,6 +12,7 @@ log = logging.getLogger(__name__)
 JANUS_SERVER_STATUS_NORMAL = 0
 JANUS_SERVER_STATUS_ABNORMAL = 1
 JANUS_SERVER_STATUS_MAINTENANCE = 2
+JANUS_SERVER_STATUS_HWM = 3
 
 
 class BackendServer(object):
@@ -91,13 +92,18 @@ class BackendServerManager(object):
 
     @staticmethod
     def get_valid_servers(server_dao):
-        valid_servers = []
+        normal_servers = []
+#        hwm_servers = []
         now = time.time()
-        for server in server_dao.get_list():
-            if server.status == JANUS_SERVER_STATUS_NORMAL and \
-                    (server.expire == 0 or now - server.utime < server.expire):
-                valid_servers.append(server)
-        return valid_servers
+        all_server_list = server_dao.get_list()
+        for server in all_server_list:
+            if server.expire == 0 or now - server.utime < server.expire:
+                if server.status == JANUS_SERVER_STATUS_NORMAL:
+                    normal_servers.append(server)
+#                elif server.status == JANUS_SERVER_STATUS_HWM:
+#                    hwm_servers.append(server)
+
+        return normal_servers
 
     def _rand_algo(self, server_dao, session_transport):
         server_list = BackendServerManager.get_valid_servers(server_dao)

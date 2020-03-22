@@ -29,6 +29,10 @@ janus:
 
   request_timeout: 10                   # how long to wait for reply from the monitored janus server, default is 10 secs
 
+  hwm_threshold: 1                      # if the round-trip time of ping-pong is over hwm_threshold (unit: sec), mark
+                                        # this Janus server status HWM(High Water Mark), if hwm_threshold is 0, means
+                                        # not enable hwm check
+
 proc_watcher:
   cmdline: ""                           # command line to start up janus-server. default is empty, means not enable
                                         # the process watcher of Sentinel

@@ -6,10 +6,10 @@ import importlib
 import gevent
 
 
-from januscloud.common.error import JanusCloudError, JANUS_ERROR_SERVICE_UNAVAILABLE
-from januscloud.common.utils import random_uint64, create_janus_msg, get_host_ip
+from januscloud.common.error import JanusCloudError, JANUS_ERROR_SERVICE_UNAVAILABLE, JANUS_ERROR_BAD_GATEWAY
+from januscloud.common.utils import random_uint64, create_janus_msg, get_host_ip, get_monotonic_time
 from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
-    JANUS_SERVER_STATUS_MAINTENANCE
+    JANUS_SERVER_STATUS_MAINTENANCE, JANUS_SERVER_STATUS_HWM
 from januscloud.proxy.core.backend_session import BackendTransaction
 from januscloud.sentinel.process_mngr import PROC_RUNNING
 from januscloud.transport.ws import WSClient
@@ -20,7 +20,8 @@ log = logging.getLogger(__name__)
 class JanusServer(object):
 
     def __init__(self, server_name, server_ip, ws_port, admin_ws_port=0,
-                 pingpong_interval=5, statistic_interval=10, request_timeout=10):
+                 pingpong_interval=5, statistic_interval=10, request_timeout=10,
+                 hwm_threshold=0):
         self.server_name = server_name
         if self.server_name is None or self.server_name == '':
             self.server_name = 'server_{}'.format(random_uint64())
@@ -35,6 +36,8 @@ class JanusServer(object):
         self.status = JANUS_SERVER_STATUS_ABNORMAL
         self._in_maintenance = False
         self._admin_ws_port = admin_ws_port
+        self._hwm_threshold = hwm_threshold
+
         self._ws_client = None
         self._admin_ws_client = None
         self._transactions = {}
@@ -87,7 +90,7 @@ class JanusServer(object):
     def public_url(self):
         return 'ws://{}:{}'.format(self.server_public_ip, self.ws_port)
 
-    def update_status(self, new_status):
+    def set_status(self, new_status):
         if self._in_maintenance:
             return  # ignore state change when maintaining
         old_status = self.status
@@ -113,28 +116,32 @@ class JanusServer(object):
     def start_maintenance(self):
         if self._in_maintenance:
             return    # already under maintenance
-        self.update_status(JANUS_SERVER_STATUS_MAINTENANCE)
+        self.set_status(JANUS_SERVER_STATUS_MAINTENANCE)
         self._in_maintenance = True
 
     def stop_maintenance(self):
         if not self._in_maintenance:
             return
         self._in_maintenance = False
-        self.update_status(JANUS_SERVER_STATUS_ABNORMAL)
+        self.set_status(JANUS_SERVER_STATUS_ABNORMAL)
 
     def pingpong(self):
         try:
             if self._ws_client is None:
                 self._ws_client = WSClient(self.url,
                                            self._recv_msg_cbk, self._close_cbk, protocols=['janus-protocol'])
-
-            self.send_request(self._ws_client, create_janus_msg('ping'), )
-
-            self.update_status(JANUS_SERVER_STATUS_NORMAL)
+            ping_start_ts = get_monotonic_time()
+            self.send_request(self._ws_client, create_janus_msg('ping'))
+            ping_end_ts = get_monotonic_time()
+            ping_latency = ping_end_ts - ping_start_ts
+            if self._hwm_threshold and ping_latency > self._hwm_threshold:
+                self.set_status(JANUS_SERVER_STATUS_HWM)
+            else:
+                self.set_status(JANUS_SERVER_STATUS_NORMAL)
 
         except Exception as e:
             log.warning('Poll janus server({}) failed: {}'.format(self.url, e))
-            self.update_status(JANUS_SERVER_STATUS_ABNORMAL)
+            self.set_status(JANUS_SERVER_STATUS_ABNORMAL)
             if self._ws_client:
                 try:
                     self._ws_client.close()
@@ -147,8 +154,16 @@ class JanusServer(object):
             if self._admin_ws_client is None:
                 self._admin_ws_client = WSClient(self.admin_url, self._recv_msg_cbk, None, protocols=['janus-admin-protocol'])
 
+            response = self.send_request(self._admin_ws_client, create_janus_msg('list_sessions'))
+            sessions = response.get('sessions', [])
+            handles = []
+            for session_id in sessions:
+                response = self.send_request(self._admin_ws_client,
+                                             create_janus_msg('list_handles', session_id=session_id))
+                handles.extend(response.get('handles', []))
+            self.update_stat(session_num=len(sessions), handle_num=len(handles))
         except Exception as e:
-            log.warning('Poll janus server({}) failed: {}'.format(self.url, e))
+            log.warning('calculate stat of janus server({}) failed: {}'.format(self.admin_url, e))
             if self._admin_ws_client:
                 try:
                     self._admin_ws_client.close()
@@ -176,6 +191,8 @@ class JanusServer(object):
             client.send_message(send_msg)
             response = transaction.wait_response(timeout=self._request_timeout)
             log.debug('Receive Response {} from Janus server: {}'.format(response, client.url))
+            if response['janus'] == 'error':
+                raise JanusCloudError(response['error']['reason'], response['error']['code'])
             return response
         finally:
             self._transactions.pop(transaction_id, None)
@@ -184,7 +201,7 @@ class JanusServer(object):
         if self._has_destroy:
             return
         log.info('WebSocket closed for Janus server {} '.format(self.url))
-        self.update_status(JANUS_SERVER_STATUS_ABNORMAL)
+        self.set_status(JANUS_SERVER_STATUS_ABNORMAL)
 
     def _recv_msg_cbk(self, msg):
         try:
@@ -216,6 +233,7 @@ class JanusServer(object):
             if self._has_destroy:
                 break
             self.query_stat()
+
 
     def on_process_status_change(self, watcher):
         log.debug('on_process_status_change is called, new status: {}'.format(watcher.process_status))

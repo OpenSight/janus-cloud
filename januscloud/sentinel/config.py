@@ -27,6 +27,7 @@ config_schema = Schema({
         Optional("pingpong_interval"): Default(IntVal(min=1, max=3600), default=5),
         Optional("statistic_interval"): Default(IntVal(min=1, max=3600), default=10),
         Optional("request_timeout"): Default(IntVal(min=1, max=3600), default=10),
+        Optional("hwm_threshold"): Default(IntVal(min=0, max=300), default=0),
         AutoDel(str): object  # for all other key remove
     }, default={}),
 

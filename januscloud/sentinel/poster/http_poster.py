@@ -54,7 +54,7 @@ class HttpPoster(BasicPoster):
         if self._stat_updated:
             data['session_num'] = self._janus_server.session_num
             data['handle_num'] = self._janus_server.handle_num,
-        self._stat_updated = False
+            self._stat_updated = False
 
         for i in range(len(self.post_urls)):
             url = self.post_urls[self._cur_index]

@@ -57,6 +57,7 @@ def do_main(config):
             pingpong_interval=config['janus']['pingpong_interval'],
             statistic_interval=config['janus']['statistic_interval'],
             request_timeout=config['janus']['request_timeout'],
+            hwm_threshold=config['janus']['hwm_threshold']
         )
 
         # set up janus_watcher
