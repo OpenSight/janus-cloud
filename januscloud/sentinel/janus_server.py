@@ -30,8 +30,8 @@ class JanusServer(object):
         if server_ip == '127.0.0.1':
             self.server_public_ip = get_host_ip()
         self.ws_port = ws_port
-        self.session_num = 0
-        self.handle_num = 0
+        self.session_num = -1
+        self.handle_num = -1
         self.start_time = 0
         self.status = JANUS_SERVER_STATUS_ABNORMAL
         self._in_maintenance = False
@@ -104,7 +104,7 @@ class JanusServer(object):
     def update_stat(self, session_num, handle_num):
         self.session_num = session_num
         self.handle_num = handle_num
-        log.info('janus server({}) update session_num:{}, handle_num: {}'.format(
+        log.info('janus server({}) stat updated: session_num {}, handle_num {}'.format(
             self.url, self.session_num, self.handle_num))
         for listener in self._listeners:
             if hasattr(listener, 'on_stat_updated') and callable(listener.on_stat_updated):
