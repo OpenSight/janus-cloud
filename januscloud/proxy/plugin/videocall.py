@@ -506,10 +506,7 @@ class VideoCallHandle(FrontendHandleBase):
         return data['result'], reply_jsep
 
 
-
 class VideoCallPlugin(PluginBase):
-    """ This base class for plugin """
-
 
     def __init__(self, proxy_config, backend_server_mgr, pyramid_config):
         super().__init__(proxy_config, backend_server_mgr, pyramid_config)
@@ -561,25 +558,24 @@ class VideoCallPlugin(PluginBase):
             raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(peer_username),
                                     JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME)
         if peer.handle:
+            # the peer is handled by self
             peer.handle.handle_incoming_call(caller_username, backend_server_url)
         elif peer.api_url:
+            # the peer is handled by the other janus-proxy
             caller = self.user_dao.get_by_username(caller_username)
             if caller is None or caller.handle is None:
                 raise JanusCloudError('Not support relay http request',
                                         JANUS_VIDEOCALL_ERROR_INVALID_REQUEST)
             r = requests.post(peer.api_url,
-                              data = {'caller_username': caller_username,
-                                      'backend_server_url': backend_server_url,
-                                      'backend_keepalive_interval':str(backend_keepalive_interval)})
+                              data={'caller_username': caller_username,
+                                    'backend_server_url': backend_server_url,
+                                    'backend_keepalive_interval':str(backend_keepalive_interval)})
             if r.status_code != requests.codes.ok:
                 try:
                     text = r.json()['info']
                 except Exception:
                     text = r.text
                 raise JanusCloudError(text, r.status_code)
-
-
-
 
     @staticmethod
     def read_config(config_file):

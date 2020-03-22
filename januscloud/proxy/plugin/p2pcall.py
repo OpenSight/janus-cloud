@@ -410,12 +410,14 @@ class P2PCallHandle(FrontendHandleBase):
                                     JANUS_P2PCALL_ERROR_NO_SUCH_USERNAME)
 
         if peer.handle:
+            # if dest user is handled by the same proxy, send to him directly
             log.debug('An async event ({}) is sent from \'{}\' to \'{}\' at local proxy'.format(
                 event_msg, from_user, to_user
             ))
-            # if dest user is handled by the same proxy, send to him directly
+
             peer.handle.on_async_event(from_user, event_msg)
         elif peer.api_url:
+            # if dest user is handled by the other proxy, send to him by RESTful api
             log.debug('An async event ({}) is sent from \'{}\' to \'{}\' by {}'.format(
                 event_msg, from_user, to_user, peer.api_url
             ))
