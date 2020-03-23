@@ -5,6 +5,7 @@ import time
 import importlib
 import gevent
 import random
+import bisect
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ class BackendServerManager(object):
             self._select_algorithm = self._rand_algo
         elif select_mode == 'lb':
             self._select_algorithm = self._rand_algo
+        elif select_mode == 'wr':
+            self._select_algorithm = self._wr_algo
         elif ':' in select_mode:
             module_name, sep, method_name = select_mode.partition(':')
             module = importlib.import_module(module_name)
@@ -110,6 +113,23 @@ class BackendServerManager(object):
         if len(server_list) == 0:
             return None
         index = random.randint(0, len(server_list) - 1)
+        return server_list[index]
+
+    def _wr_algo(self, server_dao, session_transport):
+        server_list = BackendServerManager.get_valid_servers(server_dao)
+        if len(server_list) == 0:
+            return None
+        running_total = 0
+        totals = []
+        for server in server_list:
+            if server.handle_num > 0:
+                weight = 1 / server.handle_num
+            else:
+                weight = 1
+            running_total += weight
+            totals.append(running_total)
+        rnd = random.random() * running_total
+        index = bisect.bisect_right(totals, rnd)
         return server_list[index]
 
     def _rr_algo(self, server_dao, session_transport):
