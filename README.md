@@ -22,116 +22,174 @@ Features
 * the Same API with the Janus server, which is compatible with the original client of the Janus server
 
 
-Overview
+Components
 -------------------
 
-Janus-cloud has two main components, Janus-proxy and Janus-sentinel, which are responsible for two different functions.
+Janus-cloud has two main components, Janus-proxy and Janus-sentinel.
 
 ### Janus-proxy
 
-Janus-proxy is responsible for signal handling, which communicates with the WebRTC client and relay the signal to the backend Janus servers. It conceals the detail of the backend Janus server cluster and output the same interface with the original Janus server. Janus-proxy is usually running on a standalone machine which is between the WebRTC client and the backend Janus servers. The WebRTC client interact with Janus-proxy for signal, but transfer to/from the real Janus Server for media. Janus-proxy has the following features/limitation:
+Janus-proxy is responsible for signal handling, which communicates with the WebRTC client and relay the signal from client to the backend Janus servers. It conceals the detail of the backend Janus server cluster and output the same interface with the original Janus server. Janus-proxy is usually running on a standalone machine which is between the WebRTC client and the backend Janus servers. The WebRTC client interact with Janus-proxy for signal, but transfer to/from the real Janus Server for media. Janus-proxy has the following features/limitation:
 
-* Only provide the WebSocket(s) API, but not provide RESTful, RabbitMQ, MQTT, Nanomsg and UnixSockets like Janus
-* Pluggable. Its functionality is implemented by the various plugins
+* Only provide the WebSocket(s) API, not provide RESTful, RabbitMQ, MQTT, Nanomsg and UnixSockets like Janus
+* Communicate with the backend Janus server by WebSocket
+* Pluggable. Its business functionality is implemented by the various plugins
 * Support RESTful admin interface
-* Scalable. Janus server can be added/removed to/from the cluster dynamically
-
+* Scalable. The backend Janus server can be added/removed to/from Janus-proxy dynamically
+* Support multi algorithm to choose which backend server to relay signal
 
 ### Janus-sentinel
 
-Janus-sentinel is responsible for caring for the Janus server, normally, it runs at the same (virtual) machine with the Janus server. it has the following capabilities:
+Janus-sentinel is responsible to care for the Janus server, normally, it runs at the same (virtual) machine with the Janus server. it has the following capabilities:
 
 * Supervise the process of the Janus server, and keep it running
 * Monitor the status of the Janus server, and report it to Janus-proxy through HTTP
 * Calculate the workload of the Janus server
-* Support post the status/workload stat to multi HTTP URL
+* Support post the status/workload statistic to multi HTTP URL
 
 Note: the process of the Janus server can be started and maintained by the other system tools or system administrator manul, instead of Janus-sentinel. In this case, Janus-sentinel is only responsible for monitoring Janus server's status by its WebSocket API. But this approach is not a good idea.
 
-Plugins for Janus-proxy
+Plugins of Janus-proxy
 ------------------------------
 
 The business logic of Janus-proxy is implemented by the plugins. By now, the folloing plugins is provided in box. 
 
 ### echotest
 
+This is a trivial EchoTest plugin which is only used for test and show plugin interface of Janus-proxy. It provide devlopers a scketch for plugin
+
 ### videocall
 
+This is a simple video call plugin which allow two WebRTC peer communicate with each other through the medium Janus server. It achieves the same funciton and outputs the same APIs with the videocall plugin of Janus server, as well as it can distribute the workload among the backend Janus servers. 
+Moreover, Janus-proxy also can be scaled out for videocall plugin to handle much more video calls. Different WebRTC peers may be assigned to different Janus-proxies which is able to communicates with each other through admin interface.
+
 ### p2pcall
+
+This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janux-proxy be able to scaled out to handle more video call. Howerver no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
+
 
 ### videoroom
 
 
+
+
 Topology
 -----------------
-The deployment of Janus-cloud would be similar with the below topology. 
+The structure of Janus-cloud would be similar with the below topology. 
 
 
 ```
-                                                                                     +------------------------------+
-                                                                                     |Virtual Machine 2             |
-                                                                                     |      +----------+            |
-                                                                              +------------>+  Janus   |            |
-                                                                              |      |      +----------+            |
-                                                                              |      |                              |
-                                       +------------------------------+       |      |      +-------------------+   |
-                                       |Virtual Machine 1             |       |      |      |  Janus Sentinel   |   |
-+-----------------------+              |                              |       |      |      +-------------------+   |
-| Web Browser           |   WebSocket  |      +----------------+      |       |      +------------------------------+
-| (e.g. Chrome/Firefox) +-------------------->+  Janus Proxy   +--------------+
-+-----------------------+              |      +----------------+      |       |
-                                       |                              |       |      +------------------------------+
-                                       +------------------------------+       |      |Virtual Machine 3             |
-                                                                              |      |       +---------+            |
-                                                                              +------------->+ Janus   |            |
-                                                                                     |       +---------+            |
-                                                                                     |                              |
-                                                                                     |       +------------------+   |
-                                                                                     |       | Janus Sentinel   |   |
-                                                                                     |       +------------------+   |
-                                                                                     +------------------------------+
+                                                                               +-----------------------------+
+                                                                               |Virtual Machine 2            |
+                                                                               |      +----------+           |
+                                                                          +---------->+  Janus   |           |
+                                                                          |    |      +-----+----+           |
+                                                                          |    |            |                |
+                                     +------------------------------+     |    |      +-----+-------------+  |
+                                     |Virtual Machine 1             |     |    |      |  Janus-sentinel   |  |
++-----------------------+            |                              |     |    |      +-------------------+  |
+| Web Browser           |  WebSocket |      +----------------+      |     |    +-----------------------------+
+| (e.g. Chrome/Firefox) +------------------>+  Janus-proxy   +------------+
++-----------------------+            |      +----------------+      |     |
+                                     |                              |     |    +-----------------------------+
+                                     +------------------------------+     |    |Virtual Machine 3            |
+                                                                          |    |     +---------+             |
+                                                                          +--------->+ Janus   |             |
+                                                                               |     +-----+---+             |
+                                                                               |           |                 |
+                                                                               |     +-----+------------+    |
+                                                                               |     | Janus-sentinel   |    |
+                                                                               |     +------------------+    |
+                                                                               +-----------------------------+
 
 
 ```
-Janus-proxy is often deployed on a standalone machine between WebRTC client(like Browser) and Janus server. All signal infomation from would be transfer to Janus-proxy by WebSocket first , then relayed to one of the backend Janus servers.
+Janus-proxy is often deployed on a standalone machine between WebRTC client(like Browser) and Janus server. All signal  from WebRTC client would be received by Janus-proxy first , then relayed to one of the backend Janus servers.
 
-Janus-sentinel is often deployed along with the Janus server on the same machine. Janus-sentinel keep Janus process running and moniter its status, and report to Janus-proxy. 
+Janus-sentinel is often deployed along with the Janus server on the same machine. Janus-sentinel keep Janus process running and moniter its status, then report to Janus-proxy at intervals.
 
 
 Installation
 ----------------
 
+Janus-cloud supports python 3.5 and up. It's strongly recommand install Janus-cloud in a python virtual environment, like "venv". 
+
+###install from PyPi
+
+Janus-cloud has not submited to pypi yet, please wait.
+
 ### install from source
 
-Janus-cloud supports python 3.5 and up. To install 
+To install Janus-cloud from project source, type the following shell command at the project's root directly:
 
 ``` {.sourceCode .bash}
 $ python setup.py install
 ```
 
+For developer, who want to debug the Janus-cloud, and install it for develop mode:
+
+``` {.sourceCode .bash}
+$ python setup.py develop
+```
 
 Configure and Start
 ---------------------------
 
-### janus-sentinel
+If installed from source, some sample configuration files (with explanations) are shipped within the project source at <Project root>/conf. 
 
-### janus-proxy
-
-To start
+If installed from PyPi, you can type the following command, which would install the sample configuration files, the certifications, test html page and other static resource into the specific directory of your system.
 
 ``` {.sourceCode .bash}
-$ janus-proxy <config file path>
+$ python janus-install-conf <install_dir>
+```
+
+### janus-sentinel
+
+Edit the configuration file of Janus-sentinel, then type the following commands to start.
+
+``` {.sourceCode .bash}
+$ janus-sentinel <janus-sentinel config file path>
 ```
 
 
-Requirements of the backend Janus server configuration
---------------------------------------
+### janus-proxy
 
-By now, Janus-proxy / Janus-sentinel communicates with the backend Janus server only by WebSocket, not support other transport. And consider that the API of the backend Janus server is only used by Janus-proxy / Janus-sentinel internel, and not directly output to outside, so no secret/token mechanism is applied in the communication between them now. 
+Edit the configuration file of Janus-proxy, then type the following commands to start.
 
-In summary, there are some requirements below on the configuration of the backend Janus sever when deploy with Janux-cloud:
+``` {.sourceCode .bash}
+$ janus-proxy <janus-proxy config file path>
+```
 
-* WebSocket transport must be enabled
-* api_secret and token_auth which are used for api security must be disabled 
+Requirements for the backend Janus server configuration
+-----------------------------------------------------------
+
+By now, Janus-proxy / Janus-sentinel only suport corresponding with the backend Janus server by WebSocket, not support other transport. And there is no secret/token mechanism applied in the communication between them, because the API of the Janus server is only used by Janus-proxy / Janus-sentinel internel, and not directly output to outside.
+
+In summary, there are some requirements below on the configuration of the backend Janus sever when deploying with Janux-cloud:
+
+* WebSocket transport must be enabled to correspond with Janus-proxy/Janus-sentinel
+* api_secret and token_auth which are used for the api security must be disabled 
 * admin_secret must be disabled
 
+Structure of project source
+---------------------------------
+
+janus-cloud/
+    |
+	+----conf/            Sample configuration files
+	|
+	+----cert/            Default certification for wss
+	|
+	+----html/            Html & js page code for test client
+	|
+	+----januscloud/      Pythond code package of janus-cloud
+	|
+	+----CHANGES.md       change log for each release
+	|
+	+----README.md        This readme
+	|
+	+----LICENSE          AGPL 3.0 license 
+	|
+	+----MANIFEST.in      Manifest file describing the static resource file
+	|
+	+----setup.py         Python setup script
