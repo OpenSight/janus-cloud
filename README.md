@@ -5,7 +5,7 @@ Janus-cloud is an JANUS API proxy to construct the Janus WebRTC server cluster, 
 
 **NOTE: !!! in-developing, don't fork me !!!  **
 
-Why Janus-cloud
+1 Why Janus-cloud
 -----------------
 
 Janus is an excellent WebRTC server, simple and well-structured. Its pluggable design and sophisticated API is impressive and amazing. But it also comes with some disadvantage.
@@ -13,7 +13,7 @@ First, Janus is design to be a standalone server, which cannot be scale to suppo
 Second, Janus processes the WebRTC signalling, as well as the media data. But in the real communication world, signalling and media are usually divided into two plane, so that more flexibility can be provided. Janus-cloud fulfills this requirement by handling the signalling only and leaving media to Janus-server. Janus-cloud is developed by Python3 language which is more suitable to deal with the signalling, in the other hand, C language, which is used by Janus server, is more suitable to transmit media data in an efficient way . 
 
 
-Features
+2 Features
 -----------------
 
 * Scalable, Janus media servers can be added/removed to/from the cluster dynamically
@@ -22,7 +22,7 @@ Features
 * the Same API with the Janus server, which is compatible with the original client of the Janus server
 
 
-Components
+3 Components
 -------------------
 
 Janus-cloud has two main components, Janus-proxy and Janus-sentinel.
@@ -49,7 +49,7 @@ Janus-sentinel is responsible to care for the Janus server, normally, it runs at
 
 Note: the process of the Janus server can be started and maintained by the other system tools or system administrator manul, instead of Janus-sentinel. In this case, Janus-sentinel is only responsible for monitoring Janus server's status by its WebSocket API. But this approach is not a good idea.
 
-Plugins of Janus-proxy
+4 Plugins of Janus-proxy
 ------------------------------
 
 The business logic of Janus-proxy is implemented by the plugins. By now, the folloing plugins is provided in box. 
@@ -73,7 +73,7 @@ This is an other video call plugin, very similar to the videocall plugin, except
 
 
 
-Topology
+5 Topology
 -----------------
 The structure of Janus-cloud would be similar with the below topology. 
 
@@ -109,16 +109,16 @@ Janus-proxy is often deployed on a standalone machine between WebRTC client(like
 Janus-sentinel is often deployed along with the Janus server on the same machine. Janus-sentinel keep Janus process running and moniter its status, then report to Janus-proxy at intervals.
 
 
-Installation
+6 Installation
 ----------------
 
 Janus-cloud supports python 3.5 and up. It's strongly recommand install Janus-cloud in a python virtual environment, like "venv". 
 
-###install from PyPi
+### Install from PyPi
 
 Janus-cloud has not submited to pypi yet, please wait.
 
-### install from source
+### Install from source
 
 To install Janus-cloud from project source, type the following shell command at the project's root directly:
 
@@ -132,7 +132,7 @@ For developer, who want to debug the Janus-cloud, and install it for develop mod
 $ python setup.py develop
 ```
 
-Configure and Start
+7 Configure and Start
 ---------------------------
 
 If installed from source, some sample configuration files (with explanations) are shipped within the project source at <Project root>/conf. 
@@ -160,7 +160,7 @@ Edit the configuration file of Janus-proxy, then type the following commands to 
 $ janus-proxy <janus-proxy config file path>
 ```
 
-Requirements for the backend Janus server configuration
+8 Requirements for the backend Janus server
 -----------------------------------------------------------
 
 By now, Janus-proxy / Janus-sentinel only suport corresponding with the backend Janus server by WebSocket, not support other transport. And there is no secret/token mechanism applied in the communication between them, because the API of the Janus server is only used by Janus-proxy / Janus-sentinel internel, and not directly output to outside.
@@ -171,9 +171,11 @@ In summary, there are some requirements below on the configuration of the backen
 * api_secret and token_auth which are used for the api security must be disabled 
 * admin_secret must be disabled
 
-Structure of project source
+
+9 Directory structure of project source
 ---------------------------------
 
+```
 janus-cloud/
     |
 	+----conf/            Sample configuration files
@@ -193,3 +195,4 @@ janus-cloud/
 	+----MANIFEST.in      Manifest file describing the static resource file
 	|
 	+----setup.py         Python setup script
+```
