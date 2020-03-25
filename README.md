@@ -73,7 +73,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 
 - rtp_forward not support
 - audiolevel_event not support
-- subsriber switch not support
+- subscriber switch not support
 
 5 Topology
 -----------------
@@ -118,7 +118,18 @@ Janus-cloud supports python 3.5 and up. It's strongly recommanded to install Jan
 
 ### Install from PyPi
 
-Janus-cloud has not submited to pypi yet, please wait.
+To install Janus-cloud from PyPi, 
+
+``` {.sourceCode .bash}
+$ python pip install janus-cloud
+```
+
+To install the static resources of janus-cloud, like sample configuration, default cert, test html pages, 
+
+``` {.sourceCode .bash}
+$ python janus-install-conf <install_dir>
+```
+where <install_dir> is the install directory which would contains the resources in your system.
 
 ### Install from source
 
@@ -176,6 +187,8 @@ In summary, there are some requirements below on the configuration of the backen
 
 9 Directory structure of project source
 ---------------------------------
+
+Keep It Simple, and Stupid
 
 ```
 janus-cloud/
