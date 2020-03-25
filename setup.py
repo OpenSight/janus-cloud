@@ -21,6 +21,7 @@ setup(name='janus-cloud',
       url='https://github.com/OpenSight/janus-cloud',
       description='Janus-cloud is an JANUS API proxy to implement the Janus WebRTC server cluster',
       long_description=README + '\n\n' + CHANGES,
+      long_description_content_type="text/markdown",
       classifiers=[
           "Development Status :: 3 - Alpha",
           "Framework :: Pyramid",
