@@ -29,6 +29,7 @@ class HttpPoster(BasicPoster):
         self._state_changed_event = Event()
         self._cur_index = 0
         self._stat_updated = False
+        self._post_session = requests.session()
 
     def _post_routine(self):
         while True:
@@ -64,7 +65,7 @@ class HttpPoster(BasicPoster):
             if self._cur_index >= len(self.post_urls):
                 self._cur_index = 0
             try:
-                r = requests.post(url,  data=data, timeout=self._http_timeout)
+                r = self._post_session.post(url,  data=data, timeout=self._http_timeout)
                 if r.status_code == requests.codes.ok:
                     return True
                 else:
