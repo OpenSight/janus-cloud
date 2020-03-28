@@ -3,7 +3,6 @@ from januscloud.common.error import JanusCloudError, JANUS_ERROR_NOT_IMPLEMENTED
 from januscloud.common.schema import Schema, StrVal, Default, AutoDel, Optional, BoolVal, IntVal, \
     StrRe, EnumVal, Or, DoNotCare
 from januscloud.common.confparser import parse as parse_config
-from pkg_resources import Requirement, resource_filename
 import os
 
 config_schema = Schema({

@@ -15,7 +15,7 @@ def main():
     if len(sys.argv) == 2:
         config = load_conf(sys.argv[1])
     else:
-        config = load_conf('/etc/janus-cloud/conf/janus-sentinel.yml')
+        config = load_conf('/opt/janus-cloud/conf/janus-sentinel.yml')
 
     if config['general']['daemonize']:
         with DaemonContext(stdin=sys.stdin,

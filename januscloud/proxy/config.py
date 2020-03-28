@@ -69,9 +69,9 @@ def load_conf(path):
 
     # set up the default cert pathname
     if config['certificates'].get('cert_key') is None:
-        config['certificates']['cert_key'] = resource_filename(Requirement.parse("janus-cloud"), "/certs/mycert.key")
+        config['certificates']['cert_key'] = resource_filename("januscloud", "certs/mycert.key")
     if config['certificates'].get('cert_pem') is None:
-        config['certificates']['cert_pem'] = resource_filename(Requirement.parse("janus-cloud"), "/certs/mycert.pem")
+        config['certificates']['cert_pem'] = resource_filename("januscloud", "certs/mycert.pem")
 
     # check other configure option is valid or not
     # TODO
