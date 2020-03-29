@@ -114,47 +114,44 @@ Janus-sentinel is often deployed along with the Janus server on the same machine
 6 Installation
 ----------------
 
+Before installation, the following requrements must be satisfied.
+
+- Python >= 3.5
+- pip
+- setuptools 
+
+
 Janus-cloud supports python 3.5 and up. It's strongly recommanded to install Janus-cloud in a python virtual environment, like "venv". 
 
-### Install from PyPi
+### Install from PyPi 
 
 To install Janus-cloud from PyPi, 
 
 ``` {.sourceCode .bash}
-$ python pip install janus-cloud
+$ pip install janus-cloud
 ```
-
-To install the static resources of janus-cloud, like sample configuration, default cert, test html pages, 
-
-``` {.sourceCode .bash}
-$ python janus-install-conf <install_dir>
-```
-where <install_dir> is the install directory which would contains the resources in your system.
 
 ### Install from source
 
-To install Janus-cloud from project source, type the following shell command at the project's root directly:
+To install Janus-cloud from project source
 
 ``` {.sourceCode .bash}
-$ python setup.py install
+$ pip install <project_root>
 ```
+
+Where <project_root> is the root directory of project source, which contians the setup.py file
 
 For developer, who want to debug the Janus-cloud, and install it for develop mode:
 
 ``` {.sourceCode .bash}
-$ python setup.py develop
+$ pip install -e <project_root>
 ```
 
 7 Configure and Start
 ---------------------------
 
-If installed from source, some sample configuration files (with explanations) are shipped within the project source at <Project root>/conf. 
-
-If installed from PyPi, you can type the following command, which would install the sample configuration files, the certifications, test html page and other static resource into the specific directory of your system.
-
-``` {.sourceCode .bash}
-$ python janus-install-conf <install_dir>
-```
+Some resource files, like sample configuration(with explanations), html test scripts, and etc, are shipped within the project source. 
+After installation, these resource would be installed under ** <sys.prefix>/opt/janus-cloud ** where <sys.prefix> is the root diriectory of your filesystem. or the the root directory of virtual environment if install in a virtual environment. 
 
 ### janus-sentinel
 
@@ -163,7 +160,6 @@ Edit the configuration file of Janus-sentinel, then type the following commands 
 ``` {.sourceCode .bash}
 $ janus-sentinel <janus-sentinel config file path>
 ```
-
 
 ### janus-proxy
 
@@ -181,8 +177,8 @@ By now, Janus-proxy / Janus-sentinel only suport corresponding with the backend 
 In summary, there are some requirements below on the configuration of the backend Janus sever when deploying with Janux-cloud:
 
 * WebSocket transport must be enabled to correspond with Janus-proxy/Janus-sentinel
-* api_secret and token_auth which are used for the api security must be disabled 
-* admin_secret must be disabled
+* api_secret and token_auth feature must be disabled 
+* admin_secret feature must be disabled
 
 
 9 Directory structure of project source
@@ -194,8 +190,6 @@ Keep It Simple, and Stupid
 janus-cloud/
     |
     +----conf/            Sample configuration files
-    |
-    +----cert/            Default certification for wss
     |
     +----html/            Html & js page code for test client
     |
