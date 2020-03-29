@@ -151,7 +151,7 @@ $ pip install -e <project_root>
 ---------------------------
 
 Some resource files, like sample configuration(with explanations), html test scripts, and etc, are shipped within the project source. 
-After installation, these resource would be installed under ** <sys.prefix>/opt/janus-cloud ** where <sys.prefix> is the root diriectory of your filesystem. or the the root directory of virtual environment if install in a virtual environment. 
+After installation, these resource would be installed under **<sys.prefix>/opt/janus-cloud** where <sys.prefix> is the root diriectory of your filesystem. or the the root directory of virtual environment if install in a virtual environment. 
 
 ### janus-sentinel
 
