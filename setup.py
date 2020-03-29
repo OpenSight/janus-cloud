@@ -65,6 +65,5 @@ setup(name='janus-cloud',
       [console_scripts]
       janus-proxy = januscloud.proxy.main:main
       janus-sentinel = januscloud.sentinel.main:main
-      janus-install-conf = januscloud.console:install_conf
       """,
       )
