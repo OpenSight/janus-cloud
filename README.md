@@ -1,7 +1,7 @@
 Janus-cloud
 =============
 
-Janus-cloud is an JANUS API proxy to construct the Janus WebRTC server cluster, which is based on Python3 so that it can be deployed on any platform. A Back-to-Back API proxy would be deployed between the client and the original Janus servers. In one hand, the WebRTC client communicates with Janus-cloud proxy through Janus' original  API, just like with the real Janus server. In the other hand, Janus-cloud proxy would forwards the requests to the back-end Janus server in the cluster on behave of the client. Janus-cloud proxy is only responsible for the API (signalling) processing, while media streams is still left to Janus server to relay, so that the clients would establish the PeerConnctions with the back-end Janus server directly, without Janus-cloud involvement. In this case, Janus-cloud proxy can be considered as a WebRTC signal server, while the original Janus server would be downgraded to work as a WebRTC media server.
+Janus-cloud is an JANUS API proxy to construct the Janus WebRTC server cluster, which is based on Python3 so that it can be deployed on any platform. A Back-to-Back API proxy would be deployed between the client and the original Janus servers. In one hand, the WebRTC client communicates with Janus-cloud proxy through Janus' original  API, just like with the real Janus server. In the other hand, Janus-cloud proxy would forwards the requests to the back-end Janus server in the cluster on behave of the client. Janus-cloud proxy is only responsible for the API (signalling) processing, while media streams is still left to Janus server to relay, so that the clients would establish the PeerConnections with the back-end Janus server directly, without Janus-cloud involvement. In this case, Janus-cloud proxy can be considered as a WebRTC signal server, while the original Janus server would be downgraded to work as a WebRTC media server.
 
 1 Why Janus-cloud
 -----------------
@@ -45,31 +45,31 @@ Janus-sentinel is responsible to care for the Janus server, normally, it runs at
 - Calculate the workload of the Janus server
 - Support post the status/workload statistic to multi HTTP URL
 
-Note: the process of the Janus server can be started and maintained by the other system tools or system administrator manul, instead of Janus-sentinel. In this case, Janus-sentinel is only responsible for monitoring Janus server's status by its WebSocket API. But this approach is not a good idea.
+Note: the process of the Janus server can be started and maintained by the other system tools or system administrator manual, instead of Janus-sentinel. In this case, Janus-sentinel is only responsible for monitoring Janus server's status by its WebSocket API. But this approach is not a good idea.
 
 4 Plugins of Janus-proxy
 ------------------------------
 
-Janus-proxy is composed of many plugins, and the business logic of Janus-proxy is implemented by these plugins. The folloing plugins are provided within Janus-proxy by now. 
+Janus-proxy is composed of many plugins, and the business logic of Janus-proxy is implemented by these plugins. The following plugins are provided within Janus-proxy by now.
 
 ### echotest
 
-This is a trivial EchoTest plugin which is only used for test and show plugin interface of Janus-proxy. It provide devlopers a scketch for plugin
+This is a trivial EchoTest plugin which is only used for test and show plugin interface of Janus-proxy. It provide developers a skeleton for plugin
 
 ### videocall
 
-This is a simple video call plugin which allow two WebRTC peer communicate with each other through the medium Janus server. It achieves the same funciton and outputs the same APIs with the videocall plugin of Janus server, as well as it can distribute the workload among the backend Janus servers. 
+This is a simple video call plugin which allow two WebRTC peer communicate with each other through the medium Janus server. It achieves the same function and outputs the same APIs with the videocall plugin of Janus server, as well as it can distribute the workload among the backend Janus servers.
 Moreover, Janus-proxy also can be scaled out for videocall plugin to handle much more video calls. Different WebRTC peers may be assigned to different Janus-proxies which is able to communicates with each other through admin interface.
 
 ### p2pcall
 
-This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janux-proxy be able to scaled out to handle more video call. Howerver no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
+This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janus-proxy be able to scaled out to handle more video call. However no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
 
 
 ### videoroom
 
 
-This is a plugin implementing a videoconferencing SFU, just like videoroom plugin of the Janus server. It tries to keep almost the same API with the videoroom plugin of Janus server, and scale it out by distributing different publishers to different backend Janus server, so that Janus-proxy can support more publishers in one videoconferencing room than single Janus server. Constrast to the vidroroom plugin of Janus server, there are some limitations below on this plugin to simplify the code. 
+This is a plugin implementing a videoconferencing SFU, just like videoroom plugin of the Janus server. It tries to keep almost the same API with the videoroom plugin of Janus server, and scale it out by distributing different publishers to different backend Janus server, so that Janus-proxy can support more publishers in one videoconferencing room than single Janus server. Contrast to the videoroom plugin of Janus server, there are some limitations below on this plugin to simplify the code.
 
 - rtp_forward not support
 - audiolevel_event not support
@@ -108,20 +108,20 @@ The structure of Janus-cloud would be similar with the below topology.
 ```
 Janus-proxy is often deployed on a standalone machine between WebRTC client(like Browser) and Janus server. All signal  from WebRTC client would be received by Janus-proxy first , then relayed to one of the backend Janus servers.
 
-Janus-sentinel is often deployed along with the Janus server on the same machine. Janus-sentinel keep Janus process running and moniter its status, then report to Janus-proxy at intervals.
+Janus-sentinel is often deployed along with the Janus server on the same machine. Janus-sentinel keep Janus process running and monitor its status, then report to Janus-proxy at intervals.
 
 
 6 Installation
 ----------------
 
-Before installation, the following requrements must be satisfied.
+Before installation, the following requirements must be satisfied.
 
 - Python >= 3.5
 - pip
 - setuptools 
 
 
-Janus-cloud supports python 3.5 and up. It's strongly recommanded to install Janus-cloud in a python virtual environment, like "venv". 
+Janus-cloud supports python 3.5 and up. It's strongly recommended to install Janus-cloud in a python virtual environment, like "venv".
 
 ### Install from PyPi 
 
@@ -139,7 +139,7 @@ To install Janus-cloud from project source
 $ pip install <project_root>
 ```
 
-Where <project_root> is the root directory of project source, which contians the setup.py file
+Where <project_root> is the root directory of project source, which contains the setup.py file
 
 For developer, who want to debug the Janus-cloud, and install it for develop mode:
 
@@ -151,7 +151,7 @@ $ pip install -e <project_root>
 ---------------------------
 
 Some resource files, like sample configuration(with explanations), html test scripts, and etc, are shipped within the project source. 
-After installation, these resource would be installed under **<sys.prefix>/opt/janus-cloud** where <sys.prefix> is the root diriectory of your filesystem. or the the root directory of virtual environment if install in a virtual environment. 
+After installation, these resource would be installed under **<sys.prefix>/opt/janus-cloud** where <sys.prefix> is the root directory of your filesystem. or the the root directory of virtual environment if install in a virtual environment.
 
 ### janus-sentinel
 
@@ -172,9 +172,9 @@ $ janus-proxy <janus-proxy config file path>
 8 Requirements for the backend Janus server
 -----------------------------------------------------------
 
-By now, Janus-proxy / Janus-sentinel only suport corresponding with the backend Janus server by WebSocket, not support other transport. And there is no secret/token mechanism applied in the communication between them, because the API of the Janus server is only used by Janus-proxy / Janus-sentinel internel, and not directly output to outside.
+By now, Janus-proxy / Janus-sentinel only support corresponding with the backend Janus server by WebSocket, not support other transport. And there is no secret/token mechanism applied in the communication between them, because the API of the Janus server is only used by Janus-proxy / Janus-sentinel internal, and not directly output to outside.
 
-In summary, there are some requirements below on the configuration of the backend Janus sever when deploying with Janux-cloud:
+In summary, there are some requirements below on the configuration of the backend Janus sever when deploying with Janus-cloud:
 
 * WebSocket transport must be enabled to correspond with Janus-proxy/Janus-sentinel
 * api_secret and token_auth feature must be disabled 
@@ -193,7 +193,7 @@ janus-cloud/
     |
     +----html/            Html & js page code for test client
     |
-    +----januscloud/      Pythond code package of janus-cloud
+    +----januscloud/      Python code package of janus-cloud
     |
     +----CHANGES.md       change log for each release
     |
