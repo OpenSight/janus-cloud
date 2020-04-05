@@ -24,7 +24,7 @@ janus:
   pingpong_interval: 5                  # how often the Sentinel send the "ping" request to the monitor janus server,
                                         # default is 5 secs
 
-  statistic_interval: 10                # how oftern the Sentinel acquire the statistic data by admin API from the
+  statistic_interval: 10                # how often the Sentinel acquire the statistic data by admin API from the
                                         # monitor janus server, default is 10 secs
 
   request_timeout: 10                   # how long to wait for reply from the monitored janus server, default is 10 secs
@@ -32,6 +32,8 @@ janus:
   hwm_threshold: 1                      # if the round-trip time of ping-pong is over hwm_threshold (unit: sec), mark
                                         # this Janus server status HWM(High Water Mark), if hwm_threshold is 0, means
                                         # not enable hwm check
+  admin_secret: ""                      # if non-empty, Sentinel includes this admin_secret for all admin API request.
+                                        # Default is empty
 
 proc_watcher:
   cmdline: ""                           # command line to start up janus-server. default is empty, means not enable
@@ -54,9 +56,9 @@ log:
 
 # Configuration about the RESTful api of janus-sentinel.
 admin_api:
-  json: "indented"                  # Whether the JSON messages should be indented (default),
+  json: "indented"                      # Whether the JSON messages should be indented (default),
   # plain (no indentation) or compact (no indentation and no spaces)
-  http_listen: '0.0.0.0:8200'       # REST API server listen addr
+  http_listen: '0.0.0.0:8200'           # REST API server listen addr
 
 
 posters:

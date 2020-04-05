@@ -21,7 +21,7 @@ class JanusServer(object):
 
     def __init__(self, server_name, server_ip, ws_port, admin_ws_port=0,
                  pingpong_interval=5, statistic_interval=10, request_timeout=10,
-                 hwm_threshold=0):
+                 hwm_threshold=0, admin_secret=''):
         self.server_name = server_name
         if self.server_name is None or self.server_name == '':
             self.server_name = 'server_{}'.format(random_uint64())
@@ -37,6 +37,7 @@ class JanusServer(object):
         self._in_maintenance = False
         self._admin_ws_port = admin_ws_port
         self._hwm_threshold = hwm_threshold
+        self._admin_secret = admin_secret
 
         self._ws_client = None
         self._admin_ws_client = None
@@ -154,12 +155,16 @@ class JanusServer(object):
             if self._admin_ws_client is None:
                 self._admin_ws_client = WSClient(self.admin_url, self._recv_msg_cbk, None, protocols=['janus-admin-protocol'])
 
-            response = self.send_request(self._admin_ws_client, create_janus_msg('list_sessions'))
+            common_args = {}
+            if self._admin_secret:
+                common_args['admin_secret'] = self._admin_secret
+            response = self.send_request(self._admin_ws_client, create_janus_msg('list_sessions', **common_args))
             sessions = response.get('sessions', [])
             handles = []
             for session_id in sessions:
+
                 response = self.send_request(self._admin_ws_client,
-                                             create_janus_msg('list_handles', session_id=session_id))
+                                             create_janus_msg('list_handles', session_id=session_id, **common_args))
                 handles.extend(response.get('handles', []))
             self.update_stat(session_num=len(sessions), handle_num=len(handles))
         except Exception as e:

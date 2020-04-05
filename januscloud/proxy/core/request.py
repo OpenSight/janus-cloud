@@ -4,7 +4,7 @@ import logging
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST, JANUS_ERROR_INVALID_REQUEST_PATH, \
     JANUS_ERROR_PLUGIN_MESSAGE, JANUS_ERROR_HANDLE_NOT_FOUND, JANUS_ERROR_SESSION_NOT_FOUND, \
-    JANUS_ERROR_MISSING_MANDATORY_ELEMENT, JANUS_ERROR_INVALID_JSON
+    JANUS_ERROR_MISSING_MANDATORY_ELEMENT, JANUS_ERROR_INVALID_JSON, JANUS_ERROR_UNAUTHORIZED
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, StrVal, \
     FloatVal, AutoDel
@@ -91,6 +91,7 @@ class Request(object):
         "transaction": StrRe(r"^\S+$"),
         Optional("session_id"): IntVal(),
         Optional("handle_id"): IntVal(),
+        Optional("apisecret"): StrVal(),
         DoNotCare(str): object  # for all other key we don't care
     })
 
@@ -102,6 +103,7 @@ class Request(object):
         self.transaction = message['transaction']
         self.session_id = message.get('session_id', 0)
         self.handle_id = message.get('handle_id', 0)
+        self.apisecret = message.get('apisecret', '')
 
 
 class RequestHandler(object):
@@ -109,6 +111,7 @@ class RequestHandler(object):
     def __init__(self, frontend_session_mgr=None, proxy_conf={}):
         self._frontend_session_mgr = frontend_session_mgr
         self._proxy_conf = proxy_conf
+        self._api_secret = proxy_conf.get('general', {}).get('api_secret', '')
 
     def _get_session(self, request):
         if request.session_id == 0:
@@ -282,7 +285,13 @@ class RequestHandler(object):
             handler = getattr(self, '_handle_' + request.janus)
             if handler is None or self._frontend_session_mgr is None:
                 raise JanusCloudError('Unknown request \'{0}\''.format(request.janus), JANUS_ERROR_UNKNOWN_REQUEST)
-            # TODO check secret valid
+
+            # check secret valid
+            if self._api_secret and request.janus not in {'ping', 'info'}:
+                if self._api_secret != request.apisecret:
+                    raise JanusCloudError("Unauthorized request (wrong or missing secret/token)",
+                                          JANUS_ERROR_UNAUTHORIZED)
+
             response = handler(request)
             log.debug('Response ({}) is to return'.format(response))
             return response

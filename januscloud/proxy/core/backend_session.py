@@ -54,7 +54,7 @@ class BackendTransaction(object):
 class BackendSession(object):
     """ This backend session represents a session of the backend Janus server """
 
-    def __init__(self, url, auto_destroy=False):
+    def __init__(self, url, auto_destroy=False, api_secret=''):
         self.url = url
         self._ws_client = None
         self._transactions = {}
@@ -65,6 +65,7 @@ class BackendSession(object):
         self._auto_destroy_greenlet = None
         self._keepalive_interval = 10
         self._keepalive_greenlet = None
+        self._api_secret = api_secret
         _sessions[url] = self
 
     def init(self):
@@ -142,6 +143,8 @@ class BackendSession(object):
         send_msg = dict.copy(msg)
         send_msg['session_id'] = self.session_id
         send_msg['transaction'] = transaction_id
+        if self._api_secret:
+            send_msg['apisecret'] = self._api_secret
         transaction = BackendTransaction(transaction_id, send_msg, url=self.url, ignore_ack=ignore_ack)
         try:
             self._transactions[transaction_id] = transaction
@@ -265,13 +268,15 @@ class BackendSession(object):
 
 _sessions = {}
 
+_api_secret = ''
+
 
 def get_backend_session(server_url, auto_destroy=False):
     session = _sessions.get(server_url)
     if session is None:
         # create new session
         session = \
-            BackendSession(server_url, auto_destroy=auto_destroy)
+            BackendSession(server_url, auto_destroy=auto_destroy, api_secret=_api_secret)
         try:
             session.init()
         except Exception as e:
@@ -288,6 +293,10 @@ def get_backend_session(server_url, auto_destroy=False):
                                     JANUS_ERROR_BAD_GATEWAY)
     return session
 
+
+def set_api_secret(api_secret):
+    global _api_secret
+    _api_secret = api_secret
 
 if __name__ == '__main__':
     from januscloud.common.logger import test_config

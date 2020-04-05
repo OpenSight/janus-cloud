@@ -61,6 +61,8 @@ def do_main(config):
         backend_server_manager = BackendServerManager(config['general']['server_select'],
                                                       config['janus_server'],
                                                       server_dao)
+        from januscloud.proxy.core.backend_session import set_api_secret
+        set_api_secret(config['general']['api_secret'])
 
         # rest api config
         pyramid_config = Configurator()

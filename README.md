@@ -172,13 +172,13 @@ $ janus-proxy <janus-proxy config file path>
 8 Requirements for the backend Janus server
 -----------------------------------------------------------
 
-By now, Janus-proxy / Janus-sentinel only support corresponding with the backend Janus server by WebSocket, not support other transport. And there is no secret/token mechanism applied in the communication between them, because the API of the Janus server is only used by Janus-proxy / Janus-sentinel internal, and not directly output to outside.
+By now, Janus-proxy / Janus-sentinel only support corresponding with the backend Janus server by WebSocket, not support other transport.
 
-In summary, there are some requirements below on the configuration of the backend Janus sever when deploying with Janus-cloud:
+In summary, there are the following requirements on the configuration of the backend Janus server when deploying with Janus-cloud:
 
 * WebSocket transport must be enabled to correspond with Janus-proxy/Janus-sentinel
-* api_secret and token_auth feature must be disabled 
-* admin_secret feature must be disabled
+* token_auth must be disabled
+
 
 
 9 Directory structure of project source

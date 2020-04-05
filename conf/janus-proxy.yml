@@ -26,6 +26,13 @@ general:
                                         # thirdparty method.
                                         # for the thirdparty method, it can be given in form "module_name:method_name".
                                         # default is "rr".
+
+  api_secret: ""                        # String that all API requests must contain to be accepted/authorized by
+                                        # the Janus-proxy. Useful if you're wrapping all Janus API requests in your
+                                        # servers (that is, not in the browser, where you do the things your way) and you
+                                        # don't want other application to mess with this Janus-proxy instance.
+                                        # Furthermore, this api_secret is also included in all the requests to the backend
+                                        # Janus server. Default is empty
 log:
   log_to_stdout: true                   # Whether the Janus output should be written
                                         # to stdout or not (default=true)

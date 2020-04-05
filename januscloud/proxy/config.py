@@ -14,6 +14,7 @@ config_schema = Schema({
         Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=60),
         Optional("server_db"): Default(StrVal(), default='memory'),
         Optional("server_select"): Default(StrVal(), default='rr'),
+        Optional('api_secret'): Default(StrVal(), default=''),
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
     Optional("log"): Default({
