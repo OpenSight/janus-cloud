@@ -4,7 +4,9 @@ import copy
 
 import json
 import logging
-from januscloud.common.utils import error_to_janus_msg, create_janus_msg
+import socket
+
+from januscloud.common.utils import error_to_janus_msg, create_janus_msg, get_host_ip
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST, JANUS_ERROR_INVALID_REQUEST_PATH, \
     JANUS_ERROR_BAD_GATEWAY, JANUS_ERROR_CONFLICT, JANUS_ERROR_NOT_IMPLEMENTED, JANUS_ERROR_INTERNAL_ERROR
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
@@ -518,9 +520,23 @@ class P2PCallPlugin(PluginBase):
 
     @staticmethod
     def get_api_base_url(proxy_config):
-        server_name = proxy_config['general']['server_name']
-        listen_addr, sep, port = proxy_config['admin_api']['http_listen'].partition(':')
-        return 'http://' + server_name + ':' + str(port) + JANUS_P2PCALL_API_BASE_PATH
+        server_addr = None
+        server_name = proxy_config['general']['server_name'].strip()
+        if len(server_name) > 0 and server_name != '127.0.0.1' and 'localhost' not in server_name:
+            server_addr = server_name
+#            try:
+#                ip = socket.gethostbyname(server_name)
+#                if ip and ip not in {'127.0.0.1', '0.0.0.0'}:
+#                    server_addr = server_name
+#            except socket.error as e:
+#                # server_name is not a valid host domain name
+#                pass
+        listen_addr, sep, port = proxy_config['admin_api']['http_listen'].strip().partition(':')
+        if server_addr is None and listen_addr != '0.0.0.0':
+            server_addr = listen_addr.strip()
+        if server_addr is None:
+            server_addr = get_host_ip()
+        return 'http://' + server_addr + ':' + str(port) + JANUS_P2PCALL_API_BASE_PATH
 
 
 def includeme(config):
