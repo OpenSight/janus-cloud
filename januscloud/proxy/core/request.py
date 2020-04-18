@@ -140,7 +140,7 @@ class RequestHandler(object):
         reply['author'] = 'OpenSight'
         reply['email'] = 'public@opensight.cn'
         reply['website'] = 'https://github.com/OpenSight/janus-cloud'
-        reply['server_name'] = self._proxy_conf.get('general', {}).get('server_name', 'MyJanusCloudProxy')
+        reply['server_name'] = self._proxy_conf.get('general', {}).get('server_name', '')
         reply['session-timeout'] = self._proxy_conf.get('general', {}).get('session_timeout', 60)
 
         plugin_info_list = {}
