@@ -38,10 +38,14 @@ JANUS_VIDEOCALL_ERROR_USE_ECHO_TEST = 479
 JANUS_VIDEOCALL_ERROR_NO_CALL = 481
 JANUS_VIDEOCALL_ERROR_MISSING_SDP = 482
 
+JANUS_VIDEOCALL_API_SYNC_DATE = '2020-04-18'
+
 JANUS_VIDEOCALL_VERSION = 6
 JANUS_VIDEOCALL_VERSION_STRING = '0.0.6'
 JANUS_VIDEOCALL_DESCRIPTION = 'This is a a simple video call plugin for Janus-cloud, ' \
-                                'allow two WebRTC peer communicate with each other through Janus server'
+                                'which allow two WebRTC peer communicate with each other through Janus server. ' \
+                              'Its API is kept sync with videocall of Janus-server until ' + \
+                              JANUS_VIDEOCALL_API_SYNC_DATE
 JANUS_VIDEOCALL_NAME = 'JANUS VideoCall plugin'
 JANUS_VIDEOCALL_AUTHOR = 'opensight.cn'
 JANUS_VIDEOCALL_PACKAGE = 'janus.plugin.videocall'
@@ -64,7 +68,10 @@ set_schema = Schema({
     Optional('record'): BoolVal(),
     Optional('restart'): BoolVal(),
     Optional('filename'): StrVal(),
-    DoNotCare(str): object  # for all other key we don't care
+    Optional('substream'): IntVal(min=0, max=2),
+    Optional('temporal'): IntVal(min=0, max=2),
+    Optional('fallback'): IntVal(min=0),
+    AutoDel(str): object  # for all other key we must delete
  })
 
 post_videocall_user_schema = Schema({
@@ -260,7 +267,7 @@ class VideoCallHandle(FrontendHandleBase):
                         raise
 
             elif request == 'accept':
-                if self.videocall_user is None or self.videocall_user.incall == False \
+                if self.videocall_user is None or self.videocall_user.incall is False \
                         or self.videocall_user.peer_name == '' or self.backend_handle is None:
                     raise JanusCloudError('No incoming call to accept', JANUS_VIDEOCALL_ERROR_NO_CALL)
                 if jsep is None:
@@ -271,7 +278,7 @@ class VideoCallHandle(FrontendHandleBase):
             elif request == 'set':
                 if self.backend_handle:
                     # send set request to backend server
-                    result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
+                    result, reply_jsep = self._send_backend_meseage(self.backend_handle, body, jsep)
                 else:
                     body = set_schema.validate(body)
                     if self._pending_set_body:
@@ -407,6 +414,10 @@ class VideoCallHandle(FrontendHandleBase):
             elif event == 'slow_link':
                 if self.videocall_user is None or self.videocall_user.incall == False:
                     log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
+                    return
+            elif event == 'simulcast':
+                if self.videocall_user is None or self.videocall_user.incall is False:
+                    log.warning('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
                     return
             else:
                 if self.videocall_user is None or self.videocall_user.incall == False:
