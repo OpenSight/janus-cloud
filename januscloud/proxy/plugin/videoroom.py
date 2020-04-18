@@ -51,14 +51,18 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
+JANUS_VIDEOROOM_API_SYNC_DATE = '2020-04-18'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
 JANUS_VIDEOROOM_DESCRIPTION = 'This is a plugin implementing a videoconferencing SFU for Janus-cloud, ' \
-                              'that is an audio/video router.'
+                              'that is an audio/video router whose API is kept sync with videoroom of Janus-server ' \
+                              'until ' + JANUS_VIDEOROOM_API_SYNC_DATE
 JANUS_VIDEOROOM_NAME = 'JANUS VideoRoom plugin'
 JANUS_VIDEOROOM_AUTHOR = 'opensight.cn'
 JANUS_VIDEOROOM_PACKAGE = 'janus.plugin.videoroom'
+
+
 
 
 JANUS_VIDEOROOM_API_BASE_PATH = '/plugins/videoroom'
@@ -187,6 +191,7 @@ subscriber_join_schema = Schema({
     Optional('offer_data'): BoolVal(),
     Optional('substream'): IntVal(min=0, max=2),
     Optional('temporal'): IntVal(min=0, max=2),
+    Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
     AutoDel(str): object  # for all other key we must delete
@@ -200,6 +205,7 @@ subscriber_configure_schema = Schema({
     Optional('restart'): BoolVal(),
     Optional('substream'): IntVal(min=0, max=2),
     Optional('temporal'): IntVal(min=0, max=2),
+    Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
     AutoDel(str): object  # for all other key we must delete
@@ -297,7 +303,9 @@ class VideoRoomSubscriber(object):
                   close_pc=True,
                   audio=True, video=True, data=True,
                   offer_audio=True, offer_video=True, offer_data=True,
-                  substream=-1, temporal=-1, spatial_layer=-1, temporal_layer=-1):
+                  substream=-1, temporal=-1,
+                  fallback=-1,
+                  spatial_layer=-1, temporal_layer=-1):
         self._assert_valid()
         if self._backend_handle is not None:
             raise JanusCloudError('Already subscribe',
@@ -350,6 +358,8 @@ class VideoRoomSubscriber(object):
                 body['substream'] = substream
             if temporal >= 0:
                 body['temporal'] = temporal
+            if fallback >= 0:
+                body['fallback'] = fallback
             if spatial_layer >= 0:
                 body['spatial_layer'] = spatial_layer
             if temporal_layer >= 0:
@@ -372,7 +382,9 @@ class VideoRoomSubscriber(object):
 
     def configure(self, audio=None, video=None, data=None,
                   update=False, restart=False,
-                  substream=-1, temporal=-1, spatial_layer=-1, temporal_layer=-1):
+                  substream=-1, temporal=-1,
+                  fallback=-1,
+                  spatial_layer=-1, temporal_layer=-1):
         self._assert_valid()
         if self._kicked:
             raise JanusCloudError('Unauthorized, you have been kicked',
@@ -399,9 +411,11 @@ class VideoRoomSubscriber(object):
             body['substream'] = substream
         if temporal >= 0:
             body['temporal'] = temporal
+        if fallback >= 0:
+            body['fallback'] = fallback
         if spatial_layer >= 0:
             body['spatial_layer'] = spatial_layer
-        if temporal_layer >=0:
+        if temporal_layer >= 0:
             body['temporal_layer'] = temporal_layer
 
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body)
@@ -1732,7 +1746,12 @@ class VideoRoomHandle(FrontendHandleBase):
                     'videocodec': ','.join(room.videocodec),
                     'record': room.record,
                     'record_dir': room.rec_dir,
-                    'num_participants': room.num_participants()
+                    'num_participants': room.num_participants(),
+                    'audiolevel_ext': room.audiolevel_ext,
+                    'audiolevel_event': room.audiolevel_event,
+                    'videoorient_ext': room.videoorient_ext,
+                    'playoutdelay_ext': room.playoutdelay_ext,
+                    'transport_wide_cc_ext': room.transport_wide_cc_ext,
                 }
                 if room.bitrate_cap:
                     room_info['bitrate_cap'] = True
@@ -1740,6 +1759,9 @@ class VideoRoomHandle(FrontendHandleBase):
                     room_info['opus_fec'] = True
                 if room.video_svc:
                     room_info['video_svc'] = True
+                if room.audiolevel_event:
+                    room_info['audio_active_packets'] = room.audio_active_packets
+                    room_info['audio_level_average'] = room.audio_level_average
 
                 room_info_list.append(room_info)
 
