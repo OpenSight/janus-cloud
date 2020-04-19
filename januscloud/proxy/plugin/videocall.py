@@ -38,14 +38,14 @@ JANUS_VIDEOCALL_ERROR_USE_ECHO_TEST = 479
 JANUS_VIDEOCALL_ERROR_NO_CALL = 481
 JANUS_VIDEOCALL_ERROR_MISSING_SDP = 482
 
-JANUS_VIDEOCALL_API_SYNC_DATE = '2020-04-18'
+JANUS_VIDEOCALL_API_SYNC_VERSION = 'v0.9.2(2020-04-18)'
 
 JANUS_VIDEOCALL_VERSION = 6
 JANUS_VIDEOCALL_VERSION_STRING = '0.0.6'
 JANUS_VIDEOCALL_DESCRIPTION = 'This is a a simple video call plugin for Janus-cloud, ' \
                                 'which allow two WebRTC peer communicate with each other through Janus server. ' \
                               'Its API is kept sync with videocall of Janus-server until ' + \
-                              JANUS_VIDEOCALL_API_SYNC_DATE
+                              JANUS_VIDEOCALL_API_SYNC_VERSION
 JANUS_VIDEOCALL_NAME = 'JANUS VideoCall plugin'
 JANUS_VIDEOCALL_AUTHOR = 'opensight.cn'
 JANUS_VIDEOCALL_PACKAGE = 'janus.plugin.videocall'
@@ -57,8 +57,8 @@ JANUS_VIDEOCALL_API_BASE_PATH = '/plugins/videocall'
 INCOMMING_CALL_TIMEOUT = 10
 
 username_schema = Schema({
-         'username': StrRe('^\w{1,128}$'),
-        DoNotCare(str): object  # for all other key we don't care
+    'username': StrRe('^\w{1,128}$'),
+    DoNotCare(str): object  # for all other key we don't care
  })
 
 set_schema = Schema({
@@ -81,6 +81,7 @@ post_videocall_user_schema = Schema({
     AutoDel(str): object  # for all other key we must delete
 })
 
+
 class VideoCallUser(object):
 
     def __init__(self, username, handle=None, incall=False, peer_name='', api_url=''):
@@ -94,6 +95,7 @@ class VideoCallUser(object):
 
     def __str__(self):
         return 'Video Call User"{0}"({1})'.format(self.username, self.api_url)
+
 
 class VideoCallHandle(FrontendHandleBase):
 
@@ -126,8 +128,6 @@ class VideoCallHandle(FrontendHandleBase):
             self.backend_handle = None
             backend_handle.detach()
 
-
-
     def handle_hangup(self):
         log.debug('handle_hangup for videocall Handle {}'.format(self.handle_id))
         if self.backend_handle:
@@ -140,11 +140,9 @@ class VideoCallHandle(FrontendHandleBase):
         self._enqueue_async_message(transaction, body, jsep)
         return JANUS_PLUGIN_OK_WAIT, None
 
-
     def handle_trickle(self, candidate=None, candidates=None):
         log.debug('handle_trickle for videocall handle {}.candidate:{} candidates:{}'.
-                 format(self.handle_id, candidate, candidates))
-
+                  format(self.handle_id, candidate, candidates))
 
         if self.videocall_user is None or self.videocall_user.incall == False:
             if candidates:
@@ -180,7 +178,8 @@ class VideoCallHandle(FrontendHandleBase):
             self.videocall_user.incall = False
             raise
 
-        # if incoming_call event cannot be received in INCOMMING_CALL_TIMEOUT(10) seconds, auto disconnect the backend server
+        # if incoming_call event cannot be received in INCOMMING_CALL_TIMEOUT(10) seconds,
+        # auto disconnect the backend server
         if self._auto_disconnect_greenlet is None:
             self._auto_disconnect_greenlet = gevent.spawn_later(INCOMMING_CALL_TIMEOUT, self._auto_disconnect_routine)
 
@@ -276,15 +275,15 @@ class VideoCallHandle(FrontendHandleBase):
                 # send accept request to backend server
                 result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
             elif request == 'set':
-                if self.backend_handle:
+                if self.backend_handle:  # has set up the backend handle
                     # send set request to backend server
                     result, reply_jsep = self._send_backend_meseage(self.backend_handle, body, jsep)
                 else:
                     body = set_schema.validate(body)
-                    if self._pending_set_body:
-                        self._pending_set_body.update(body)
-                    else:
+                    if self._pending_set_body is None:
                         self._pending_set_body = body
+                    else:
+                        self._pending_set_body.update(body)
                     result = {
                         'event': 'set'
                     }
@@ -336,7 +335,6 @@ class VideoCallHandle(FrontendHandleBase):
                 log.error('unknown request {}'.format(request))
                 raise JanusCloudError('Unknown request {{}}'.format(request), JANUS_VIDEOCALL_ERROR_INVALID_REQUEST)
 
-
             # Process successfully
             data = {
                 'videocall': 'event',
@@ -344,7 +342,6 @@ class VideoCallHandle(FrontendHandleBase):
             if result:
                 data['result'] = result
             self._push_plugin_event(data, transaction=transaction)
-
 
         except JanusCloudError as e:
             log.exception('Fail to handle async message ({}) for handle {}'.format(body, self.handle_id))
@@ -364,7 +361,6 @@ class VideoCallHandle(FrontendHandleBase):
                               'error_code': JANUS_ERROR_BAD_GATEWAY,
                               'error':str(e),
                               }, transaction=transaction)
-
 
     def on_async_event(self, event_msg):
         if self._has_destroy:
@@ -394,7 +390,7 @@ class VideoCallHandle(FrontendHandleBase):
                     return
             elif event == 'accepted':
                 if self.videocall_user is None or self.videocall_user.incall == False or \
-                    self.videocall_user.peer_name != result.get('username',''):
+                   self.videocall_user.peer_name != result.get('username',''):
                     # incomingcall event invalid, ignore it
                     log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
                     return
@@ -403,7 +399,7 @@ class VideoCallHandle(FrontendHandleBase):
                 # and caller send 'call' request successfully.
                 # double check state
                 if self.videocall_user is None or self.videocall_user.incall == False or \
-                    self.videocall_user.peer_name != result.get('username',''):
+                   self.videocall_user.peer_name != result.get('username',''):
                     # incomingcall event invalid, ignore it
                     log.warn('async event {} invalid for handle {}, ignored'.format(event_msg, self.handle_id))
                     return
@@ -433,7 +429,6 @@ class VideoCallHandle(FrontendHandleBase):
                     params[key] = value
             self._push_event(event_msg['janus'], None, **params)
 
-
     def on_close(self, handle_id):
         self.backend_handle = None #detach with backend handle
 
@@ -458,10 +453,11 @@ class VideoCallHandle(FrontendHandleBase):
             self._push_plugin_event(hangup_event_data, None, None)
 
     def _connect_backend(self, server_url):
+
         if self.backend_handle is not None:
-                raise JanusCloudError('Already connected', JANUS_ERROR_INTERNAL_ERROR)
+            raise JanusCloudError('Already connected', JANUS_ERROR_INTERNAL_ERROR)
         if self.videocall_user is None:
-                raise JanusCloudError('Register a username first', JANUS_VIDEOCALL_ERROR_REGISTER_FIRST)
+            raise JanusCloudError('Register a username first', JANUS_VIDEOCALL_ERROR_REGISTER_FIRST)
 
         backend_session = get_backend_session(server_url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
@@ -476,6 +472,7 @@ class VideoCallHandle(FrontendHandleBase):
             self._send_backend_meseage(backend_handle, body)
             if self._pending_set_body:
                 self._send_backend_meseage(backend_handle, self._pending_set_body)
+                self._pending_candidates = None
             if len(self._pending_candidates) > 0:
                 backend_handle.send_trickle(candidates=self._pending_candidates)
 

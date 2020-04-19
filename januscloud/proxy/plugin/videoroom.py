@@ -51,18 +51,16 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_DATE = '2020-04-18'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.9.2(2020-04-18)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
 JANUS_VIDEOROOM_DESCRIPTION = 'This is a plugin implementing a videoconferencing SFU for Janus-cloud, ' \
                               'that is an audio/video router whose API is kept sync with videoroom of Janus-server ' \
-                              'until ' + JANUS_VIDEOROOM_API_SYNC_DATE
+                              'until ' + JANUS_VIDEOROOM_API_SYNC_VERSION
 JANUS_VIDEOROOM_NAME = 'JANUS VideoRoom plugin'
 JANUS_VIDEOROOM_AUTHOR = 'opensight.cn'
 JANUS_VIDEOROOM_PACKAGE = 'janus.plugin.videoroom'
-
-
 
 
 JANUS_VIDEOROOM_API_BASE_PATH = '/plugins/videoroom'
@@ -76,6 +74,7 @@ room_base_schema = Schema({
     Optional('permanent'): Default(BoolVal(), default=False),
     AutoDel(str): object  # for all other key we must delete
 })
+
 room_params_schema = Schema({
     Optional('description'): StrVal(max_len=256),
     Optional('secret'): StrVal(max_len=256),
@@ -163,7 +162,7 @@ publisher_configure_schema = Schema({
     Optional('filename'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
     Optional('update'): BoolVal(),
-    AutoDel(str): object  # for all other key we must delete
+    DoNotCare(str): object  # for all other key we don't care
 })
 
 publisher_publish_schema = Schema({
@@ -176,7 +175,7 @@ publisher_publish_schema = Schema({
     Optional('record'): BoolVal(),
     Optional('filename'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
-    AutoDel(str): object  # for all other key we must delete
+    DoNotCare(str): object  # for all other key we don't care
 })
 
 subscriber_join_schema = Schema({
@@ -194,7 +193,7 @@ subscriber_join_schema = Schema({
     Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
-    AutoDel(str): object  # for all other key we must delete
+    DoNotCare(str): object  # for all other key we don't care
 })
 
 subscriber_configure_schema = Schema({
@@ -208,7 +207,7 @@ subscriber_configure_schema = Schema({
     Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
-    AutoDel(str): object  # for all other key we must delete
+    DoNotCare(str): object  # for all other key we don't care
 })
 
 JANUS_VIDEOROOM_P_TYPE_NONE = 0
@@ -305,7 +304,8 @@ class VideoRoomSubscriber(object):
                   offer_audio=True, offer_video=True, offer_data=True,
                   substream=-1, temporal=-1,
                   fallback=-1,
-                  spatial_layer=-1, temporal_layer=-1):
+                  spatial_layer=-1, temporal_layer=-1,
+                  **kwargs):
         self._assert_valid()
         if self._backend_handle is not None:
             raise JanusCloudError('Already subscribe',
@@ -364,6 +364,8 @@ class VideoRoomSubscriber(object):
                 body['spatial_layer'] = spatial_layer
             if temporal_layer >= 0:
                 body['temporal_layer'] = temporal_layer
+            if len(kwargs) > 0:
+                body.update(kwargs)
 
             reply_data, reply_jsep = _send_backend_message(backend_handle, body)
 
@@ -384,7 +386,8 @@ class VideoRoomSubscriber(object):
                   update=False, restart=False,
                   substream=-1, temporal=-1,
                   fallback=-1,
-                  spatial_layer=-1, temporal_layer=-1):
+                  spatial_layer=-1, temporal_layer=-1,
+                  **kwargs):
         self._assert_valid()
         if self._kicked:
             raise JanusCloudError('Unauthorized, you have been kicked',
@@ -417,6 +420,8 @@ class VideoRoomSubscriber(object):
             body['spatial_layer'] = spatial_layer
         if temporal_layer >= 0:
             body['temporal_layer'] = temporal_layer
+        if len(kwargs) > 0:
+            body.update(kwargs)
 
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body)
 
@@ -738,7 +743,8 @@ class VideoRoomPublisher(object):
                 bitrate=-1,
                 record=None, filename='',
                 display='',
-                jsep=None):
+                jsep=None,
+                **kwargs):
         self._assert_valid()
         if self.sdp:
             raise JanusCloudError('Can\'t publish, already published',
@@ -749,14 +755,16 @@ class VideoRoomPublisher(object):
                               bitrate=bitrate,
                               record=record, filename=filename,
                               display=display,
-                              jsep=jsep)
+                              jsep=jsep,
+                              **kwargs)
 
     def configure(self, audio=None, video=None, data=None,
                   audiocodec='', videocodec='',
                   bitrate=-1, keyframe=False,
                   record=None, filename='',
                   display='', update=False,
-                  jsep=None):
+                  jsep=None,
+                  **kwargs):
         # check param conflict
         self._assert_valid()
         if self._backend_handle is None:
@@ -805,6 +813,9 @@ class VideoRoomPublisher(object):
             body['filename'] = filename
         if display:
             body['display'] = display
+        if len(kwargs) > 0:
+            body.update(kwargs)
+
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body, jsep=jsep)
 
         # successful
@@ -906,7 +917,6 @@ class VideoRoomPublisher(object):
             return
         if self._backend_handle:
             self._backend_handle.send_trickle(candidate=candidate, candidates=candidates)
-
 
     def on_async_event(self, event_msg):
         if self._has_destroyed:
