@@ -17,7 +17,7 @@ Second, Janus processes the WebRTC signalling, as well as the media data. But in
 - Scalable, Janus media servers can be added/removed to/from the cluster dynamically
 - Support Janus media service self-register, service monitor, circuit breaker
 - Pluggable, support the new features through developing the new plugin
-- the Same API with the Janus server, which is compatible with the original client of the Janus server
+- Consistent API with the Janus server (until v0.9.2), which is compatible with the original client of the Janus server
 
 
 3 Components
@@ -119,7 +119,6 @@ Before installation, the following requirements must be satisfied.
 - Python >= 3.5
 - pip
 - setuptools
-- Janus-gateway >= 0.9.2 (for the backend Janus server)
 
 
 Janus-cloud supports python 3.5 and up. It's strongly recommended to install Janus-cloud in a python virtual environment, like "venv".
@@ -177,7 +176,6 @@ By now, Janus-proxy / Janus-sentinel only support corresponding with the backend
 
 there are the following requirements on the backend Janus server when deploying with Janus-cloud:
 
-* Janus-gateway version >= 0.9.2
 * WebSocket transport must be enabled to correspond with Janus-proxy/Janus-sentinel
 * token_auth must be disabled
 
