@@ -118,7 +118,8 @@ Before installation, the following requirements must be satisfied.
 
 - Python >= 3.5
 - pip
-- setuptools 
+- setuptools
+- Janus-gateway >= 0.9.2 (for the backend Janus server)
 
 
 Janus-cloud supports python 3.5 and up. It's strongly recommended to install Janus-cloud in a python virtual environment, like "venv".
@@ -174,11 +175,11 @@ $ janus-proxy <janus-proxy config file path>
 
 By now, Janus-proxy / Janus-sentinel only support corresponding with the backend Janus server by WebSocket, not support other transport.
 
-In summary, there are the following requirements on the configuration of the backend Janus server when deploying with Janus-cloud:
+there are the following requirements on the backend Janus server when deploying with Janus-cloud:
 
+* Janus-gateway version >= 0.9.2
 * WebSocket transport must be enabled to correspond with Janus-proxy/Janus-sentinel
 * token_auth must be disabled
-
 
 
 9 Directory structure of project source
