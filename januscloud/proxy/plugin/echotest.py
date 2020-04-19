@@ -38,14 +38,11 @@ class EchoTestHandle(FrontendHandleBase):
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
         self.backend_handle = backend_session.attach_handle(JANUS_ECHOTEST_PACKAGE, handle_listener=self)
 
-
     def detach(self):
         super().detach()
         backend_handle = self.backend_handle
         self.backend_handle = None
         backend_handle.detach()
-
-
 
     def handle_hangup(self):
         if self.backend_handle is None:
@@ -59,11 +56,10 @@ class EchoTestHandle(FrontendHandleBase):
             raise JanusCloudError('backend handle invalid', JANUS_ERROR_BAD_GATEWAY)
 
         log.debug('handle_message for echotest handle {}. transaction:{} body:{} jsep:{}'.
-                 format(self.handle_id, transaction, body, jsep))
+                  format(self.handle_id, transaction, body, jsep))
 
         self._enqueue_async_message(transaction, body, jsep)
         return JANUS_PLUGIN_OK_WAIT, None
-
 
     def handle_trickle(self, candidate=None, candidates=None):
         if self.backend_handle is None:
@@ -93,7 +89,6 @@ class EchoTestHandle(FrontendHandleBase):
                               'error':str(e),
                               }, transaction=transaction)
 
-
     def on_async_event(self, event_msg):
         if self._has_destroy:
             return
@@ -108,17 +103,11 @@ class EchoTestHandle(FrontendHandleBase):
                     params[key] = value
             self._push_event(event_msg['janus'], None, **params)
 
-
     def on_close(self, handle_id):
         self.backend_handle = None #detach with backend handle
 
 
-
-
-
 class EchoTestPlugin(PluginBase):
-    """ This base class for plugin """
-
 
     def __init__(self, proxy_config, backend_server_mgr, pyramid_config):
         super().__init__(proxy_config, backend_server_mgr, pyramid_config)

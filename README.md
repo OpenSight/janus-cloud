@@ -54,26 +54,30 @@ Janus-proxy is composed of many plugins, and the business logic of Janus-proxy i
 
 ### echotest
 
-This is a trivial EchoTest plugin which is only used for test and show plugin interface of Janus-proxy. It provide developers a skeleton for plugin
+This is a trivial EchoTest plugin which is only used for test and show plugin interface of Janus-proxy. It provide developers a skeleton for the new plugin development
 
 ### videocall
 
 This is a simple video call plugin which allow two WebRTC peer communicate with each other through the medium Janus server. It achieves the same function and outputs the same APIs with the videocall plugin of Janus server, as well as it can distribute the workload among the backend Janus servers.
 Moreover, Janus-proxy also can be scaled out for videocall plugin to handle much more video calls. Different WebRTC peers may be assigned to different Janus-proxies which is able to communicates with each other through admin interface.
 
+Its APIs is compatible with the videocall plugin of Janus-gateway util v0.9.2.
+
 ### p2pcall
 
 This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janus-proxy be able to scaled out to handle more video call. However no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
 
+Its APIs is compatible with the videocall plugin of Janus-gateway util v0.9.2.
 
 ### videoroom
-
 
 This is a plugin implementing a videoconferencing SFU, just like videoroom plugin of the Janus server. It tries to keep almost the same API with the videoroom plugin of Janus server, and scale it out by distributing different publishers to different backend Janus server, so that Janus-proxy can support more publishers in one videoconferencing room than single Janus server. Contrast to the videoroom plugin of Janus server, there are some limitations below on this plugin to simplify the code.
 
 - rtp_forward not support
 - audiolevel_event not support
 - subscriber switch not support
+
+Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.9.2.
 
 5 Topology
 -----------------

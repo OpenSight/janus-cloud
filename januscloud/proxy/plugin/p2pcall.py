@@ -54,7 +54,6 @@ username_schema = Schema({
 })
 
 
-
 class P2PCallUser(object):
 
     def __init__(self, username, handle=None, incall=False, peer_name='', api_url=''):
