@@ -1,0 +1,1 @@
+This is a plugin implementing a videoconferencing SFU (Selective Forwarding Unit) cluster of the Janus server.

@@ -1,0 +1,1 @@
+This is a plugin to implement the video call through the P2P mode, rather than the media-server forwarding mode

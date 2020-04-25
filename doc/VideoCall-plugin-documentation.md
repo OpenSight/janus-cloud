@@ -1,0 +1,1 @@
+This is a plugin to set up a media server cluster for video call (VOIP), based on Janus-gateway server. 
