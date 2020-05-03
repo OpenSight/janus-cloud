@@ -4,6 +4,7 @@ import logging
 import time
 import importlib
 import gevent
+import uuid
 
 
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_SERVICE_UNAVAILABLE, JANUS_ERROR_BAD_GATEWAY
@@ -24,7 +25,7 @@ class JanusServer(object):
                  hwm_threshold=0, admin_secret=''):
         self.server_name = server_name
         if self.server_name is None or self.server_name == '':
-            self.server_name = 'server_{}'.format(random_uint64())
+            self.server_name = str(uuid.uuid1())   # for empty, use uuid as server name
         self.server_local_ip = server_ip
         self.server_public_ip = server_ip
         if server_ip == '127.0.0.1':

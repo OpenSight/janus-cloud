@@ -8,8 +8,8 @@ general:
 # config of the monitored janus server
 janus:
 
-  server_name: ""                       # the name of the monitored janus-server, if empty, sentinel would choose a uuid
-                                        # for it. Default is empty
+  #server_name: ""                      # the name of the monitored janus-server. By default, sentinel would
+                                        # choose a uuid.
   server_ip: "127.0.0.1"                # the ip address of the monitored janus-server, default is 127.0.0.1.
                                         # if server_addr is 127.0.0.1, Sentinel would probe the real ip of the local host,
                                         # and report the real ip to outside system. Otherwise, Sentinel would report this
