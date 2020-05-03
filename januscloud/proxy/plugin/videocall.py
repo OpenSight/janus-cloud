@@ -62,6 +62,7 @@ username_schema = Schema({
  })
 
 set_schema = Schema({
+    'request': StrVal(),
     Optional('audio'): BoolVal(),
     Optional('video'): BoolVal(),
     Optional('bitrate'): IntVal(min=1),
@@ -71,7 +72,7 @@ set_schema = Schema({
     Optional('substream'): IntVal(min=0, max=2),
     Optional('temporal'): IntVal(min=0, max=2),
     Optional('fallback'): IntVal(min=0),
-    AutoDel(str): object  # for all other key we must delete
+    DoNotCare(str): object  # for all other key we we don't care
  })
 
 post_videocall_user_schema = Schema({
@@ -472,7 +473,6 @@ class VideoCallHandle(FrontendHandleBase):
             self._send_backend_meseage(backend_handle, body)
             if self._pending_set_body:
                 self._send_backend_meseage(backend_handle, self._pending_set_body)
-                self._pending_candidates = None
             if len(self._pending_candidates) > 0:
                 backend_handle.send_trickle(candidates=self._pending_candidates)
 
