@@ -73,9 +73,9 @@ Its APIs is compatible with the videocall plugin of Janus-gateway util v0.9.2.
 
 This is a plugin implementing a videoconferencing SFU, just like videoroom plugin of the Janus server. It tries to keep almost the same API with the videoroom plugin of Janus server, and scale it out by distributing different publishers to different backend Janus server, so that Janus-proxy can support more publishers in one videoconferencing room than single Janus server. Contrast to the videoroom plugin of Janus server, there are some limitations below on this plugin to simplify the code.
 
-- rtp_forward not support
 - audiolevel_event not support
 - subscriber switch not support
+- string_ids not support
 
 Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.9.2.
 

@@ -8,13 +8,18 @@ general:
   room_auto_destroy_timeout: 0                 # if not zero, the idle room would be destroyed automatically
                                                # after "room_auto_destroy_timeout" sec. default is 0, means disable
                                                # room auto-destroy function
-  admin_key: ""                                # admin_key to create new room, if empty, means no admin_key required,
-                                               # default is empty
+  admin_key: ""                                # admin_key to create new room, if empty, means no admin_key required.
+                                               # If set, rooms can be created via API only if this key is provided
+                                               # in the request. default is empty. This admin_key is also used for the
+                                               # corresponding videoroom requests to the back-end Janus server
+  lock_rtp_forward: false                      # Whether the admin_key above should be enforced for RTP forwarding
+                                               # requests too. Default is false.
+
 
 backend_sweeper:
   enable: true                                 # if true, turn on the backend sweeper, the sweeper would check each
-                                               # backend server at intervals, and destroy all the idle rooms which is
-                                               # double confirmed. Default is true
+                                               # backend server at intervals, and destroy all the idle rooms.
+                                               # Default is true
   backend_idle_room_check_interval: 600        # the interval seconds for check, default is 600(10 minutes)
 
 rooms:

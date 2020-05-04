@@ -4,7 +4,7 @@ import copy
 
 import logging
 import re
-
+from urllib.parse import urlparse
 from januscloud.common.utils import error_to_janus_msg, create_janus_msg, random_uint64, random_uint32, \
     get_monotonic_time
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST, JANUS_ERROR_INVALID_REQUEST_PATH, \
@@ -135,6 +135,33 @@ kick_schema = Schema({
     'id': IntVal(min=1),
     AutoDel(str): object  # for all other key we must delete
 })
+rtp_forward_schema = Schema({
+    'host': StrVal(max_len=256),
+    Optional('host_family'): EnumVal(['ipv4', 'ipv6']),
+    Optional('audio_port'): IntVal(min=0, max=65535),
+    Optional('audio_ssrc'): IntVal(min=0),
+    Optional('audio_pt'): IntVal(min=0),
+    Optional('audio_rtcp_port'): IntVal(min=0, max=65535),
+    Optional('video_port'): IntVal(min=0, max=65535),
+    Optional('video_ssrc'): IntVal(min=0),
+    Optional('video_pt'): IntVal(min=0),
+    Optional('video_rtcp_port'): IntVal(min=0, max=65535),
+    Optional('video_port_2'): IntVal(min=0, max=65535),
+    Optional('video_ssrc_2'): IntVal(min=0),
+    Optional('video_pt_2'): IntVal(min=0),
+    Optional('video_port_3'): IntVal(min=0, max=65535),
+    Optional('video_ssrc_3'): IntVal(min=0),
+    Optional('video_pt_3'): IntVal(min=0),
+    Optional('data_port'): IntVal(min=0, max=65535),
+    Optional('srtp_suite'): IntVal(min=0),
+    Optional('srtp_crypto'): StrVal(),
+    AutoDel(str): object  # for all other key we must delete
+})
+stop_rtp_forward_schema = Schema({
+    'publisher_id': IntVal(min=1),
+    'stream_id': IntVal(min=0),
+    AutoDel(str): object  # for all other key we must delete
+})
 
 join_base_schema = Schema({
     'room': IntVal(min=1),
@@ -162,7 +189,7 @@ publisher_configure_schema = Schema({
     Optional('filename'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
     Optional('update'): BoolVal(),
-    DoNotCare(str): object  # for all other key we don't care
+    AutoDel(str): object  # for all other key we must delete
 })
 
 publisher_publish_schema = Schema({
@@ -175,7 +202,7 @@ publisher_publish_schema = Schema({
     Optional('record'): BoolVal(),
     Optional('filename'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
-    DoNotCare(str): object  # for all other key we don't care
+    AutoDel(str): object  # for all other key we must delete
 })
 
 subscriber_join_schema = Schema({
@@ -193,7 +220,7 @@ subscriber_join_schema = Schema({
     Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
-    DoNotCare(str): object  # for all other key we don't care
+    AutoDel(str): object  # for all other key we must delete
 })
 
 subscriber_configure_schema = Schema({
@@ -207,7 +234,7 @@ subscriber_configure_schema = Schema({
     Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
-    DoNotCare(str): object  # for all other key we don't care
+    AutoDel(str): object  # for all other key we must delete
 })
 
 JANUS_VIDEOROOM_P_TYPE_NONE = 0
@@ -365,7 +392,9 @@ class VideoRoomSubscriber(object):
             if temporal_layer >= 0:
                 body['temporal_layer'] = temporal_layer
             if len(kwargs) > 0:
-                body.update(kwargs)
+                for k, v in kwargs.items():
+                    if k not in body:
+                        body[k] = v
 
             reply_data, reply_jsep = _send_backend_message(backend_handle, body)
 
@@ -421,7 +450,9 @@ class VideoRoomSubscriber(object):
         if temporal_layer >= 0:
             body['temporal_layer'] = temporal_layer
         if len(kwargs) > 0:
-            body.update(kwargs)
+            for k, v in kwargs.items():
+                if k not in body:
+                    body[k] = v
 
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body)
 
@@ -550,7 +581,7 @@ class VideoRoomPublisher(object):
     SIMULCAST_FIREFOX_PATTERN = re.compile(r'(a=rid:\S+ send)|(a=simulcast)')
     SIMULCAST_CHROME_PATTERN = re.compile(r'a=ssrc-group:SIM')
 
-    def __init__(self, user_id, handle, display=''):
+    def __init__(self, user_id, handle, display='', backend_admin_key=''):
         self.user_id = user_id     # Unique ID in the room
         self.display = display     # Display name (just for fun)
 
@@ -567,6 +598,10 @@ class VideoRoomPublisher(object):
         self.simulcast = False
         self.audiolevel_ext = False
         self.pvt_id = 0     # This is sent to the publisher for mapping purposes, but shouldn't be shared with others
+
+        self._rtp_forwarders = {}
+
+        self._backend_admin_key = backend_admin_key
 
         self._frontend_handle = handle
 
@@ -594,6 +629,8 @@ class VideoRoomPublisher(object):
             for subscriber in subscriptions:
                 subscriber.on_owner_destroy(self)
 
+        self._rtp_forwarders.clear()
+
         if self.room:
             # remove from room
             self.room.on_participant_destroy(self.user_id)
@@ -606,6 +643,7 @@ class VideoRoomPublisher(object):
             self._backend_handle = None
             self._backend_room_id = 0
             self._backend_server = None
+
             # 1. leave the room
             try:
                 _send_backend_message(backend_handle, {
@@ -691,6 +729,8 @@ class VideoRoomPublisher(object):
             }
             if self.display:
                 body['description'] = 'januscloud-{}'.format(self.display)
+            if self._backend_admin_key:
+                body['admin_key'] = self._backend_admin_key
 
             data, reply_jsep = _send_backend_message(backend_handle, body)
             backend_room_id = data.get('room', 0)
@@ -814,7 +854,9 @@ class VideoRoomPublisher(object):
         if display:
             body['display'] = display
         if len(kwargs) > 0:
-            body.update(kwargs)
+            for k, v in kwargs.items():
+                if k not in body:
+                    body[k] = v
 
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body, jsep=jsep)
 
@@ -882,6 +924,96 @@ class VideoRoomPublisher(object):
         _send_backend_message(self._backend_handle, {
             'request': 'unpublish',
         })
+
+    def rtp_forward(self, host, **kwargs):
+
+        self._assert_valid()
+        if self._backend_handle is None:
+            raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
+                                  JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+
+        # send request to backend
+        body = {
+            'request': 'rtp_forward',
+            'room': self._backend_room_id,
+            'publisher_id': self.user_id,
+            'host': host
+        }
+        if self._backend_admin_key:
+            body['admin_key'] = self._backend_admin_key
+        if len(kwargs) > 0:
+            for k, v in kwargs.items():
+                if k not in body:
+                    body[k] = v
+
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body)
+        rtp_stream = reply_data.get('rtp_stream', {})
+
+        # get the new stream id
+        new_rtp_stream_ids = set()
+        for key, value in rtp_stream.items():
+            if key == 'audio_stream_id' or key == 'video_stream_id' or key == 'video_stream_id_2' or \
+               key == 'video_stream_id_3' or key == 'data_stream_id':
+                new_rtp_stream_ids.add(value)
+
+        # get the new forwarder info
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body={
+            'request': 'listforwarders',
+            'room': self._backend_room_id,
+        })
+        backend_rtp_forwarders = []
+        for publisher in reply_data.get('rtp_forwarders', []):
+            if publisher.get('publisher_id', 0) == self.user_id:
+                backend_rtp_forwarders = publisher.get('rtp_forwarders', [])
+                break
+        for backend_rtp_forwarder in backend_rtp_forwarders:
+            stream_id = None
+            if stream_id is None:
+                stream_id = backend_rtp_forwarder.get('audio_stream_id')
+            if stream_id is None:
+                stream_id = backend_rtp_forwarder.get('video_stream_id')
+            if stream_id is None:
+                stream_id = backend_rtp_forwarder.get('data_stream_id')
+            if stream_id is None or stream_id not in new_rtp_stream_ids:
+                continue
+
+            # this backend_rtp_forwarder is the new added one
+
+            # add local_rtcp_host key
+            if 'local_rtcp_port' in backend_rtp_forwarder and \
+               'local_rtcp_host' not in backend_rtp_forwarder:
+                backend_rtp_forwarder['local_rtcp_host'] = urlparse(self._backend_server.url).hostname
+
+            self._rtp_forwarders[stream_id] = backend_rtp_forwarder
+
+        return rtp_stream
+
+    def stop_rtp_forward(self, stream_id):
+        self._assert_valid()
+        if self._backend_handle is None:
+            raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
+                                  JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+
+        if stream_id not in self._rtp_forwarders:
+            raise JanusCloudError('No such stream ({})'.format(stream_id),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+        # send request to backend
+        body = {
+            'request': 'stop_rtp_forward',
+            'room': self._backend_room_id,
+            'publisher_id': self.user_id,
+            'stream_id': stream_id
+        }
+        if self._backend_admin_key:
+            body['admin_key'] = self._backend_admin_key
+
+        _send_backend_message(self._backend_handle, body=body)
+
+        self._rtp_forwarders.pop(stream_id, None)
+
+    def rtp_forwarder_list(self):
+        return self._rtp_forwarders.values()
 
     def add_subscriber(self, subscriber):
         self._subscribers.add(subscriber)
@@ -1130,7 +1262,7 @@ class VideoRoom(object):
     def update(self):
         self.utime = time.time()
 
-    def new_participant(self, user_id, handle, display=''):
+    def new_participant(self, user_id, handle, display='', backend_admin_key=''):
         if handle is None:
             raise JanusCloudError('handle invalid', JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
         self._assert_valid()
@@ -1146,7 +1278,8 @@ class VideoRoom(object):
                                       JANUS_VIDEOROOM_ERROR_ID_EXISTS)
 
         log.debug('  -- Publisher ID: {}'.format(user_id))
-        publisher = VideoRoomPublisher(user_id=user_id, handle=handle, display=display)
+        publisher = VideoRoomPublisher(user_id=user_id, handle=handle,
+                                       display=display, backend_admin_key=backend_admin_key)
         try:
             # get pvt id
             publisher.pvt_id = random_uint32()
@@ -1328,7 +1461,7 @@ class VideoRoom(object):
             if publisher.sdp:
                 count += 1
         if count >= self.publishers:
-            raise JanusCloudError('Maximum number of publishers (%d) already reached'.format(self.publishers),
+            raise JanusCloudError('Maximum number of publishers ({}) already reached'.format(self.publishers),
                                   JANUS_VIDEOROOM_ERROR_PUBLISHERS_FULL)
 
 
@@ -1354,8 +1487,11 @@ class VideoRoomManager(object):
             raise JanusCloudError('permanent not support by memory room manager',
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
         if self._admin_key:
-            if admin_key != self._admin_key:
+            if admin_key == '':
                 raise JanusCloudError('Need admin key for creating room',
+                                      JANUS_VIDEOROOM_ERROR_MISSING_ELEMENT)
+            if admin_key != self._admin_key:
+                raise JanusCloudError('Unauthorized (wrong {})'.format(admin_key),
                                       JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
         if room_id == 0:
@@ -1847,11 +1983,78 @@ class VideoRoomHandle(FrontendHandleBase):
                 'room': room_base_info['room'],
                 'participants': part_info_list
             }
+        elif request == 'listforwarders':
+            log.debug('Attempt to list all forwarders in the room')
+            room_base_info = room_base_schema.validate(body)
+            room = self._room_mgr.get(room_base_info['room']).check_modify(room_base_info['secret'])
+            publisher_list = room.list_participants()
+            publisher_rtp_forwarders = []
+            for publisher in publisher_list:
+                publisher_rtp_forwarder_info = {
+                    'publisher_id': publisher.uid,
+                    'rtp_forwarders': publisher.rtp_forwarder_list(),
+                }
+                publisher_rtp_forwarders.append(publisher_rtp_forwarder_info)
 
-        elif request == 'listforwarders' or request == 'rtp_forward' or request == 'stop_rtp_forward':
-            raise JanusCloudError('unsupported request {} by janus-cloud'.format(body),
-                                  JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
+            result = {
+                'videoroom': 'listforwarders',
+                'room': room_base_info['room'],
+                'rtp_forwarders': publisher_rtp_forwarders
+            }
+        elif request == 'rtp_forward':
+            log.debug('Attemp to start rtp forwarder')
+            # check admin_key
+            if self._plugin.config['general']['lock_rtp_forward'] and \
+               self._plugin.config['general']['admin_key']:
+                admin_key = body.get('admin_key', '')
+                if admin_key != self._plugin.config['general']['admin_key']:
+                    raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+                                          JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
+            room_base_info = room_base_schema.validate(body)
+            room = self._room_mgr.get(room_base_info['room']).check_modify(room_base_info['secret'])
+            publisher_id = body.get('publisher_id', 0)
+            publisher = room.get_participant_by_user_id(publisher_id)
+            if publisher is None:
+                raise JanusCloudError("No such feed ({})".format(publisher_id),
+                                      JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+            forward_params = rtp_forward_schema.validate(body)
+            rtp_stream = publisher.rtp_forward(**forward_params)
+            result = {
+                'videoroom': 'rtp_forward',
+                'room': room_base_info['room'],
+                'publisher_id': publisher_id,
+                'rtp_stream': rtp_stream
+            }
+
+        elif request == 'stop_rtp_forward':
+            log.debug('Attempt to stop one rtp forwarder')
+
+            # check admin_key
+            if self._plugin.config['general']['lock_rtp_forward'] and \
+               self._plugin.config['general']['admin_key']:
+                admin_key = body.get('admin_key', '')
+                if admin_key != self._plugin.config['general']['admin_key']:
+                    raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+                                          JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
+
+            room_base_info = room_base_schema.validate(body)
+            room = self._room_mgr.get(room_base_info['room']).check_modify(room_base_info['secret'])
+            stream_info = stop_rtp_forward_schema.validate(body)
+            publisher = room.get_participant_by_user_id(stream_info['publisher_id'])
+            if publisher is None:
+                raise JanusCloudError("No such feed ({})".format(stream_info['publisher_id']),
+                                      JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+            publisher.stop_rtp_forward(stream_info['stream_id'])
+
+            result = {
+                'videoroom': 'stop_rtp_forward',
+                'room': room_base_info['room'],
+                'publisher_id': stream_info['publisher_id'],
+                'stream_id': stream_info['stream_id']
+            }
         else:
             raise JanusCloudError('Unknown request {}'.format(body),
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
@@ -1888,16 +2091,19 @@ class VideoRoomHandle(FrontendHandleBase):
                         if request == 'joinandconfigure':
                             room.check_max_publishers()
 
-                        new_publisher = room.new_participant(user_id=join_params.get('id', 0),
-                                                             handle=self,
-                                                             display=join_params.get('display', ''))
+                        new_publisher = room.new_participant(
+                            user_id=join_params.get('id', 0),
+                            handle=self,
+                            display=join_params.get('display', ''),
+                            backend_admin_key=self._plugin.config['general']['admin_key']
+                        )
                         try:
                             new_publisher.connect_backend(backend_server)
 
                             if request == 'joinandconfigure':
                                 # configure the publisher at once
                                 publish_params = publisher_publish_schema.validate(body)
-                                publish_params.pop('display', None) # no new display to set
+                                publish_params.pop('display', None)  # no new display to set
                                 if jsep:
                                     publish_params['jsep'] = jsep
                                 reply_jsep = new_publisher.publish(**publish_params)
@@ -2227,6 +2433,7 @@ class VideoRoomPlugin(PluginBase):
                 Optional("room_db"): Default(StrVal(), default='memory'),
                 Optional("room_auto_destroy_timeout"): Default(IntVal(min=0, max=86400), default=0),
                 Optional("admin_key"): Default(StrVal(), default=''),
+                Optional("lock_rtp_forward"): Default(BoolVal(), default=False),
                 AutoDel(str): object  # for all other key we don't care
             }, default={}),
             Optional("backend_sweeper"): Default({
