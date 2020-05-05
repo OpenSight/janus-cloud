@@ -2614,15 +2614,14 @@ def delete_videoroom_room(request):
     return Response(status=200)
 
 
-@get_view(route_name='videoroom_tokens')
-def get_videoroom_tokens(request):
-    plugin = request.registry.videoroom_plugin
-    room_mgr = plugin.room_mgr
-    room_id = int(request.matchdict['room_id'])
-    room = room_mgr.get(room_id)
-    tokens_info = list(room.allowed)
-
-    return tokens_info
+#@get_view(route_name='videoroom_tokens')
+#def get_videoroom_tokens(request):
+#    plugin = request.registry.videoroom_plugin
+#    room_mgr = plugin.room_mgr
+#    room_id = int(request.matchdict['room_id'])
+#    room = room_mgr.get(room_id)
+#    tokens_info = list(room.allowed)
+#    return tokens_info
 
 
 @post_view(route_name='videoroom_tokens')
