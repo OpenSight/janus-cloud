@@ -964,7 +964,9 @@ class VideoRoomPublisher(object):
         backend_rtp_forwarders = []
         for publisher in reply_data.get('rtp_forwarders', []):
             if publisher.get('publisher_id', 0) == self.user_id:
-                backend_rtp_forwarders = publisher.get('rtp_forwarders', [])
+                backend_rtp_forwarders = publisher.get('rtp_forwarder', [])
+                if len(backend_rtp_forwarders) == 0:
+                    backend_rtp_forwarders = publisher.get('rtp_forwarders', [])
                 break
         for backend_rtp_forwarder in backend_rtp_forwarders:
             stream_id = None
@@ -1013,7 +1015,7 @@ class VideoRoomPublisher(object):
         self._rtp_forwarders.pop(stream_id, None)
 
     def rtp_forwarder_list(self):
-        return self._rtp_forwarders.values()
+        return list(self._rtp_forwarders.values())
 
     def add_subscriber(self, subscriber):
         self._subscribers.add(subscriber)
@@ -1967,7 +1969,7 @@ class VideoRoomHandle(FrontendHandleBase):
             part_info_list = []
             for publisher in publisher_list:
                 part_info = {
-                    'id': publisher.uid,
+                    'id': publisher.user_id,
                     'publisher': publisher.webrtc_started,
                 }
                 if publisher.display:
@@ -1991,9 +1993,11 @@ class VideoRoomHandle(FrontendHandleBase):
             publisher_rtp_forwarders = []
             for publisher in publisher_list:
                 publisher_rtp_forwarder_info = {
-                    'publisher_id': publisher.uid,
-                    'rtp_forwarders': publisher.rtp_forwarder_list(),
+                    'publisher_id': publisher.user_id,
+                    'rtp_forwarder': publisher.rtp_forwarder_list(),
                 }
+                if publisher.display:
+                    publisher_rtp_forwarder_info['display'] = publisher.display
                 publisher_rtp_forwarders.append(publisher_rtp_forwarder_info)
 
             result = {
