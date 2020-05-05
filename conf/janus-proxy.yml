@@ -9,7 +9,7 @@ general:
   server_name: ""                       # IP address or hostname of this Janus proxy,
                                         # it will appear in an info request, and is used for addressing in proxies.
                                         # Default is empty, means this Janus proxy has no hostname
-  session_timeout: 0                    # How long (in seconds) we should wait before
+  session_timeout: 60                   # How long (in seconds) we should wait before
                                         # deciding a Janus session has timed out. A
                                         # session times out when no request is received
                                         # for session_timeout seconds (default=60s).
