@@ -4,7 +4,7 @@ Changelog
 All notable changes to this project will be documented in this file.
 
 
- [v0.2.0]  - unreleased
+ [v0.2.0]  - 2020-05-10
 ---------------------------------
 
 * Janus-proxy support api_secret authorization
