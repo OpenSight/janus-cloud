@@ -2492,6 +2492,7 @@ def includeme(config):
     config.add_route('videoroom_participant_list', JANUS_VIDEOROOM_API_BASE_PATH + '/rooms/{room_id}/participants')
     config.add_route('videoroom_participant', JANUS_VIDEOROOM_API_BASE_PATH + '/rooms/{room_id}/participants/{user_id}')
     config.add_route('videoroom_tokens', JANUS_VIDEOROOM_API_BASE_PATH + '/rooms/{room_id}/tokens')
+    config.add_route('videoroom_forwarder_list', JANUS_VIDEOROOM_API_BASE_PATH + '/rooms/{room_id}/rtp_forwarders')
     config.scan('januscloud.proxy.plugin.videoroom')
 
 
@@ -2698,6 +2699,88 @@ def delete_videoroom_participant(request):
     room_base_info = get_params_from_request(request, room_base_schema)
     room = room_mgr.get(room_id).check_modify(room_base_info['secret'])
     room.kick_participant(user_id)
+
+    return Response(status=200)
+
+
+@get_view(route_name='videoroom_forwarder_list')
+def get_videoroom_forwarder_list(request):
+    plugin = request.registry.videoroom_plugin
+    room_mgr = plugin.room_mgr
+    room_id = int(request.matchdict['room_id'])
+    params = get_params_from_request(request)
+    room_base_info = room_base_schema.validate(params)
+    room = room_mgr.get(room_id).check_modify(room_base_info['secret'])
+    publisher_list = room.list_participants()
+    publisher_rtp_forwarders = []
+    for publisher in publisher_list:
+        publisher_rtp_forwarder_info = {
+            'publisher_id': publisher.user_id,
+            'rtp_forwarder': publisher.rtp_forwarder_list(),
+        }
+        if publisher.display:
+            publisher_rtp_forwarder_info['display'] = publisher.display
+        publisher_rtp_forwarders.append(publisher_rtp_forwarder_info)
+
+    return publisher_rtp_forwarders
+
+
+@post_view(route_name='videoroom_forwarder_list')
+def post_videoroom_forwarder_list(request):
+    plugin = request.registry.videoroom_plugin
+    room_mgr = plugin.room_mgr
+    room_id = int(request.matchdict['room_id'])
+    params = get_params_from_request(request)
+
+    log.debug('Attemp to start rtp forwarder')
+    # check admin_key
+    if plugin.config['general']['lock_rtp_forward'] and \
+            plugin.config['general']['admin_key']:
+        admin_key = params.get('admin_key', '')
+        if admin_key != plugin.config['general']['admin_key']:
+            raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+                                  JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
+
+    room_base_info = room_base_schema.validate(params)
+    room = room_mgr.get(room_id).check_modify(room_base_info['secret'])
+    publisher_id = params.get('publisher_id', 0)
+    publisher = room.get_participant_by_user_id(publisher_id)
+    if publisher is None:
+        raise JanusCloudError("No such feed ({})".format(publisher_id),
+                              JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+    forward_params = rtp_forward_schema.validate(params)
+    rtp_stream = publisher.rtp_forward(**forward_params)
+
+    return rtp_stream
+
+
+@delete_view(route_name='videoroom_forwarder_list')
+def delete_videoroom_forwarder_list(request):
+    plugin = request.registry.videoroom_plugin
+    room_mgr = plugin.room_mgr
+    room_id = int(request.matchdict['room_id'])
+    params = get_params_from_request(request)
+
+    log.debug('Attempt to stop one rtp forwarder')
+
+    # check admin_key
+    if plugin.config['general']['lock_rtp_forward'] and \
+            plugin.config['general']['admin_key']:
+        admin_key = params.get('admin_key', '')
+        if admin_key != plugin.config['general']['admin_key']:
+            raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+                                  JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
+
+    room_base_info = room_base_schema.validate(params)
+    room = room_mgr.get(room_id).check_modify(room_base_info['secret'])
+    stream_info = stop_rtp_forward_schema.validate(params)
+    publisher = room.get_participant_by_user_id(stream_info['publisher_id'])
+    if publisher is None:
+        raise JanusCloudError("No such feed ({})".format(stream_info['publisher_id']),
+                              JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+    publisher.stop_rtp_forward(stream_info['stream_id'])
 
     return Response(status=200)
 
