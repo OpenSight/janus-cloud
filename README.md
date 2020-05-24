@@ -77,7 +77,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - subscriber switch not support
 - string_ids not support
 
-Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.9.2.
+Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.9.5.
 
 5 Topology
 -----------------

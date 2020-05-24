@@ -51,7 +51,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.9.2(2020-04-18)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.9.5(2020-05-24)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -86,11 +86,13 @@ room_params_schema = Schema({
     Optional('bitrate'): IntVal(min=0),
     Optional('fir_freq'): IntVal(min=0),
     Optional('audiocodec'): ListVal(EnumVal(
-        ['opus', 'g722', 'pcmu', 'pcma', 'isac32', 'isac16']
+        ['opus', 'multiopus', 'g722', 'pcmu', 'pcma', 'isac32', 'isac16']
     )),
     Optional('videocodec'): ListVal(EnumVal(
         ['vp8', 'vp9', 'h264']
     )),
+    Optional('vp9_profile'): StrVal(max_len=256),
+    Optional('h264_profile'): StrVal(max_len=256),
     Optional('opus_fec'): BoolVal(),
     Optional('video_svc'): BoolVal(),
     Optional('audiolevel_ext'): BoolVal(),
@@ -103,6 +105,7 @@ room_params_schema = Schema({
     Optional('record'): BoolVal(),
     Optional('rec_dir'): StrVal(max_len=1024),
     Optional('notify_joining'): BoolVal(),
+    Optional('lock_record'): BoolVal(),
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -116,10 +119,12 @@ room_edit_schema = Schema({
     Optional('new_publishers'): IntVal(min=1),
     Optional('new_bitrate'): IntVal(min=0),
     Optional('new_fir_freq'): IntVal(min=0),
+    Optional('new_lock_record'): BoolVal(),
     AutoDel(str): object  # for all other key we must delete
 })
 
 room_list_schema = Schema({
+    Optional('admin_key'): StrVal(),
     Optional('offset'): IntVal(min=0),
     Optional('limit'): IntVal(min=0),
     AutoDel(str): object  # for all other key we must delete
@@ -162,6 +167,10 @@ stop_rtp_forward_schema = Schema({
     'stream_id': IntVal(min=0),
     AutoDel(str): object  # for all other key we must delete
 })
+record_schema = Schema({
+    'record':  BoolVal(),
+    AutoDel(str): object  # for all other key we must delete
+})
 
 join_base_schema = Schema({
     'room': IntVal(min=1),
@@ -187,6 +196,7 @@ publisher_configure_schema = Schema({
     Optional('keyframe'): BoolVal(),
     Optional('record'): BoolVal(),
     Optional('filename'): StrVal(max_len=256),
+    Optional('secret'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
     Optional('update'): BoolVal(),
     AutoDel(str): object  # for all other key we must delete
@@ -201,6 +211,7 @@ publisher_publish_schema = Schema({
     Optional('bitrate'): IntVal(min=0),
     Optional('record'): BoolVal(),
     Optional('filename'): StrVal(max_len=256),
+    Optional('secret'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
     AutoDel(str): object  # for all other key we must delete
 })
@@ -731,6 +742,10 @@ class VideoRoomPublisher(object):
                 body['description'] = 'januscloud-{}'.format(self.display)
             if self._backend_admin_key:
                 body['admin_key'] = self._backend_admin_key
+            if self.room.h264_profile:
+                body['h264_profile'] = self.room.h264_profile
+            if self.room.vp9_profile:
+                body['vp9_profile'] = self.room.vp9_profile
 
             data, reply_jsep = _send_backend_message(backend_handle, body)
             backend_room_id = data.get('room', 0)
@@ -783,6 +798,7 @@ class VideoRoomPublisher(object):
                 bitrate=-1,
                 record=None, filename='',
                 display='',
+                secret='',
                 jsep=None,
                 **kwargs):
         self._assert_valid()
@@ -795,6 +811,7 @@ class VideoRoomPublisher(object):
                               bitrate=bitrate,
                               record=record, filename=filename,
                               display=display,
+                              secret=secret,
                               jsep=jsep,
                               **kwargs)
 
@@ -802,6 +819,7 @@ class VideoRoomPublisher(object):
                   audiocodec='', videocodec='',
                   bitrate=-1, keyframe=False,
                   record=None, filename='',
+                  secret='',
                   display='', update=False,
                   jsep=None,
                   **kwargs):
@@ -829,6 +847,13 @@ class VideoRoomPublisher(object):
             # log.debug('Participant asked for video codec \'{}\' (room {}, user {})'.format(
             #     videocodec, self.room_id, self.user_id))
 
+        # check record lock
+        record_locked = False
+        if (record is not None or filename) and self.room.lock_record and self.room.secret:
+            if secret != self.room.secret:
+                record_locked = True
+
+
         # send request to backend
         body = {
             'request': 'configure',
@@ -847,9 +872,9 @@ class VideoRoomPublisher(object):
             body['videocodec'] = videocodec
         if bitrate >= 0:
             body['bitrate'] = bitrate
-        if record:
+        if record is not None and not record_locked:
             body['record'] = record
-        if filename:
+        if filename and not record_locked:
             body['filename'] = filename
         if display:
             body['display'] = display
@@ -1034,6 +1059,23 @@ class VideoRoomPublisher(object):
         for subscriber in subscriptions:
             subscriber.kick()
 
+    def enable_recording(self, record):
+        self._assert_valid()
+        if self._backend_handle is None:
+            raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
+                                  JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+
+        log.debug('Enable recording: {} for user {} ({}) of room {}'.
+                  format(record, self.user_id, self.display, self.room_id))
+
+        # send request to backend
+        body = {
+            'request': 'enable_recording',
+            'room': self._backend_room_id,
+            'enable_recording': record
+        }
+        _send_backend_message(self._backend_handle, body=body)
+
     def push_videoroom_event(self, data):
         if self._has_destroyed:
             return
@@ -1152,7 +1194,9 @@ class VideoRoom(object):
                  video_svc=False, audiolevel_ext=True, audiolevel_event=False, audio_active_packets=100,
                  audio_level_average=25, videoorient_ext=True, playoutdelay_ext=True,
                  transport_wide_cc_ext=False, record=False, rec_dir='', check_allowed=False, allowed=set(),
-                 notify_joining=False, utime=None, ctime=None):
+                 notify_joining=False, lock_record=False,
+                 vp9_profile='', h264_profile='',
+                 utime=None, ctime=None):
 
         # public property
         self.room_id = room_id                   # Unique room ID
@@ -1203,6 +1247,10 @@ class VideoRoom(object):
         self.allowed = allowed                   # Map of participants (as tokens) allowed to join
         self.notify_joining = notify_joining     # Whether an event is sent to notify all participants if a new
                                                  # participant joins the room
+        self.lock_record = lock_record           # Whether recording state can only be changed providing the room secret
+
+        self.h264_profile = h264_profile         # H.264 codec profile to prefer, if more are negotiated
+        self.vp9_profile = vp9_profile           # VP9 codec profile to prefer, if more are negotiated
 
         #internal property
         self._participants = {}                  # Map of potential publishers (we get subscribers from them)
@@ -1295,7 +1343,6 @@ class VideoRoom(object):
             self._private_id[publisher.pvt_id] = publisher
             self.check_idle()
 
-
             # notify other new participant join
             if self.notify_joining:
                 user = {
@@ -1369,7 +1416,6 @@ class VideoRoom(object):
         publisher.room = None
         publisher.room_id = 0
 
-
         # notify publisher kick
         kick_event = {
             'videoroom': 'event',
@@ -1416,10 +1462,13 @@ class VideoRoom(object):
         self.check_idle()
 
     def notify_other_participants(self, src_participant, event):
-        participant_list = self._participants.values()
+        participant_list = list(self._participants.values())
         for publisher in participant_list:
             if publisher != src_participant:
-                publisher.push_videoroom_event(event)
+                try:
+                    publisher.push_videoroom_event(event)
+                except Exception:
+                    pass     # ignore errors during push event to each publisher
 
     def enable_allowed(self):
         log.debug('Enabling the check on allowed authorization tokens for room {}'.format(self.room_id))
@@ -1438,6 +1487,19 @@ class VideoRoom(object):
     def remove_allowed(self, allowed=[]):
         self.allowed.difference_update(allowed)
         self.update()
+
+    def enable_recording(self, record):
+        if self.record != record:   # record state changed
+            self.record = record
+            # enable recording of the exist participants
+            participant_list = list(self._participants.values())
+            for publisher in participant_list:
+                try:
+                    publisher.enable_recording(record)
+                except Exception as e:
+                    log.warning('Exception when enable recording for publisher {} ({}) of room {} : {}, ignore it'.format(
+                        publisher.user_id, publisher.display, self.room_id, e))
+                    pass     # ignore errors during enable recording for each participant
 
     def check_modify(self, secret):
         if self.secret and self.secret != secret:
@@ -1527,7 +1589,8 @@ class VideoRoomManager(object):
 
     def update(self, room_id, secret='', permanent=False,
                new_description=None, new_secret=None, new_pin=None, new_is_private=None,
-               new_require_pvtid=None, new_bitrate=None, new_publishers=None):
+               new_require_pvtid=None, new_bitrate=None, new_publishers=None,
+               new_lock_record=None):
         if permanent:
             raise JanusCloudError('permanent not support by memory room manager',
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
@@ -1550,6 +1613,8 @@ class VideoRoomManager(object):
                 room.bitrate = 64000    # Don't go below 64k
         if new_publishers is not None:
             room.publishers = new_publishers
+        if new_lock_record is not None:
+            room.lock_record = new_lock_record
 
         room.update()
 
@@ -1577,8 +1642,17 @@ class VideoRoomManager(object):
             self._public_rooms_list.remove(room)
         room.destroy()
 
-    def list(self, offset=0, limit=100):
-        return self._public_rooms_list[offset:(offset+limit)]
+    def list(self, admin_key='', offset=0, limit=100):
+        room_list = self._public_rooms_list
+        # check admin_key is correct, then list the private room
+        if self._admin_key and admin_key:
+            if admin_key != self._admin_key:
+                raise JanusCloudError('Unauthorized (wrong {})'.format(admin_key),
+                                      JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
+            else:
+                room_list = list(self._rooms_map.values())
+
+        return room_list[offset:(offset+limit)]
 
     def load_from_config(self, rooms_config=[]):
         for room_config in rooms_config:
@@ -1894,12 +1968,14 @@ class VideoRoomHandle(FrontendHandleBase):
                     'videocodec': ','.join(room.videocodec),
                     'record': room.record,
                     'record_dir': room.rec_dir,
+                    'lock_record': room.lock_record,
                     'num_participants': room.num_participants(),
                     'audiolevel_ext': room.audiolevel_ext,
                     'audiolevel_event': room.audiolevel_event,
                     'videoorient_ext': room.videoorient_ext,
                     'playoutdelay_ext': room.playoutdelay_ext,
                     'transport_wide_cc_ext': room.transport_wide_cc_ext,
+
                 }
                 if room.bitrate_cap:
                     room_info['bitrate_cap'] = True
@@ -2059,6 +2135,21 @@ class VideoRoomHandle(FrontendHandleBase):
                 'publisher_id': stream_info['publisher_id'],
                 'stream_id': stream_info['stream_id']
             }
+        elif request == 'enable_recording':
+
+            room_base_info = room_base_schema.validate(body)
+            room = self._room_mgr.get(room_base_info['room']).check_modify(room_base_info['secret'])
+            record_params = record_schema.validate(body)
+
+            log.debug('Enable Recording: {} for room {}'.format(record_params['record'], room.room_id))
+
+            room.enable_recording(record_params['record'])
+
+            result = {
+                'videoroom': 'success',
+                'record': record_params['record'],
+            }
+
         else:
             raise JanusCloudError('Unknown request {}'.format(body),
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
@@ -2456,8 +2547,10 @@ class VideoRoomPlugin(PluginBase):
                 Optional('bitrate'): IntVal(min=0),
                 Optional('bitrate_cap'): BoolVal(),
                 Optional('fir_freq'): IntVal(min=0),
-                Optional('audiocodec'): ListVal(EnumVal(['opus', 'g722', 'pcmu', 'pcma', 'isac32', 'isac16'])),
+                Optional('audiocodec'): ListVal(EnumVal(['opus', 'multiopus', 'g722', 'pcmu', 'pcma', 'isac32', 'isac16'])),
                 Optional('videocodec'): ListVal(EnumVal(['vp8', 'vp9', 'h264'])),
+                Optional('vp9_profile'): StrVal(max_len=256),
+                Optional('h264_profile'): StrVal(max_len=256),
                 Optional('opus_fec'): BoolVal(),
                 Optional('video_svc'): BoolVal(),
                 Optional('audiolevel_ext'): BoolVal(),
@@ -2469,6 +2562,7 @@ class VideoRoomPlugin(PluginBase):
                 Optional('transport_wide_cc_ext'): BoolVal(),
                 Optional('record'): BoolVal(),
                 Optional('rec_dir'): StrVal(),
+                Optional('lock_record'): BoolVal(),
                 Optional('notify_joining'): BoolVal(),
             }], default=[]),
             DoNotCare(str): object  # for all other key we don't care
