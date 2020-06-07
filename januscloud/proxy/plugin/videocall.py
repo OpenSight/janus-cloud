@@ -602,6 +602,7 @@ class VideoCallPlugin(PluginBase):
         if config_file is None or config_file == '':
             config = videocall_config_schema.validate({})
         else:
+            log.info('Videocall plugin loads the config file: {}'.format(os.path.abspath(config_file)))
             config = parse_config(config_file, videocall_config_schema)
 
         # check other configure option is valid or not

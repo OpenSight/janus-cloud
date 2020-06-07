@@ -2572,6 +2572,7 @@ class VideoRoomPlugin(PluginBase):
         if config_file is None or config_file == '':
             config = videoroom_config_schema.validate({})
         else:
+            log.info('Videoroom plugin loads the config file: {}'.format(os.path.abspath(config_file)))
             config = parse_config(config_file, videoroom_config_schema)
 
         # check other configure option is valid or not

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 
  [v0.3.0]  - unreleased
 ---------------------------------
+
 * add rtp_forward operations to the admin API of videoroom plugin
 * Add support for VP9 and H.264 profile negotiation for videoroom and echotest plugin
 * Added support for multichannel Opus audio (surround) for videoroom

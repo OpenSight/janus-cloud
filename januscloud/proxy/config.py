@@ -5,6 +5,9 @@ from januscloud.common.schema import Schema, StrVal, Default, AutoDel, Optional,
 from januscloud.common.confparser import parse as parse_config
 from pkg_resources import Requirement, resource_filename
 import os
+import logging
+
+log = logging.getLogger(__name__)
 
 config_schema = Schema({
     Optional("general"): Default({
@@ -66,6 +69,7 @@ def load_conf(path):
     if path is None or path == '':
         config = config_schema.validate({})
     else:
+        log.info('Janus-proxy loads the config file: {}'.format(os.path.abspath(path)))
         config = parse_config(path, config_schema)
 
     # set up the default cert pathname

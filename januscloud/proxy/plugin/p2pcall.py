@@ -511,6 +511,7 @@ class P2PCallPlugin(PluginBase):
         if config_file is None or config_file == '':
             config = p2pcall_config_schema.validate({})
         else:
+            log.info('P2Pcall plugin loads the config file: {}'.format(os.path.abspath(config_file)))
             config = parse_config(config_file, p2pcall_config_schema)
 
         # check other configure option is valid or not

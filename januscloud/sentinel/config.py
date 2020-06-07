@@ -4,6 +4,9 @@ from januscloud.common.schema import Schema, StrVal, Default, AutoDel, Optional,
     StrRe, EnumVal, Or, DoNotCare
 from januscloud.common.confparser import parse as parse_config
 import os
+import logging
+
+log = logging.getLogger(__name__)
 
 config_schema = Schema({
     Optional("general"): Default({
@@ -62,6 +65,7 @@ def load_conf(path):
     if path is None or path == '':
         config = config_schema.validate({})
     else:
+        log.info('Janus-sentinel loads the config file: {}'.format(os.path.abspath(path)))
         config = parse_config(path, config_schema)
 
     for i in range(len(config['posters'])):

@@ -95,3 +95,19 @@ def get_host_ip():
             s.close()
 
     return ip
+
+def to_redis_hash(o):
+    if hasattr(o, "__redis__"):
+        return o.__redis__()
+    elif hasattr(o, "__dict__"):
+        obj_dict = {}
+        for k, v in o.__dict__.items():
+            if not k.startswith("_"):
+                if v is None:
+                    v = ""
+                if v is False:
+                    v = ''
+                if v is True:
+                    v = '1'
+                obj_dict[k] = v
+        return obj_dict
