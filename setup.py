@@ -12,7 +12,8 @@ requires = [
     'PyYAML==5.1',
     'pyramid==1.10.4',
     'requests>=2.18.4',
-    'python-daemon==2.2.3'
+    'python-daemon==2.2.3',
+    'redis>=3.5.2'
 ]
 
 setup(name='janus-cloud',

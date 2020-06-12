@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 * Added support for multichannel Opus audio (surround) for videoroom
 * Added VideoRoom option to only allow admins to change the recording state
 * Enable / disable recording while conference is in progress for videoroom
+* support redis to store the backend server info
 
  [v0.2.0]  - 2020-05-10
 ---------------------------------

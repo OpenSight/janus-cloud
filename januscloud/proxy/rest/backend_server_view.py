@@ -21,7 +21,7 @@ def get_backend_server_list(request):
 
 
 server_update_schema = Schema({
-    'name': StrRe('^\S{1,64}$'),
+    'name': StrRe('^[\w-_]{1,64}$'),
     'url': StrRe('^(ws|wss)://\S+$'),
     'status': IntVal(values=(JANUS_SERVER_STATUS_NORMAL, JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_MAINTENANCE)),
     Optional("session_timeout"): IntVal(min=0, max=86400),
@@ -30,6 +30,7 @@ server_update_schema = Schema({
     Optional("location"): StrVal(min_len=0, max_len=64),
     Optional("isp"): StrVal(min_len=0, max_len=64),
     Optional("expire"): IntVal(min=0, max=86400),
+    Optional("start_time"): FloatVal(),
     AutoDel(str): object  # for all other key we must delete
 })
 

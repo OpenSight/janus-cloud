@@ -47,6 +47,16 @@ def do_main(config):
         from januscloud.proxy.dao.mem_server_dao import MemServerDao
         if config['general']['server_db'].startswith('memory'):
             server_dao = MemServerDao()
+        elif config['general']['server_db'].startswith('redis'):
+            import redis
+            from januscloud.proxy.dao.rd_server_dao import RDServerDao
+            connection_pool = redis.BlockingConnectionPool.from_url(
+                url=config['general']['server_db'],
+                decode_responses=True,
+                health_check_interval=30,
+                timeout=10)
+            redis_client = redis.Redis(connection_pool=connection_pool)
+            server_dao = RDServerDao(redis_client)
         else:
             raise JanusCloudError('server_db url {} not support'.format(config['general']['server_db']),
                                   JANUS_ERROR_NOT_IMPLEMENTED)

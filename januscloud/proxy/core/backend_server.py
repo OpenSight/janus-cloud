@@ -20,7 +20,7 @@ class BackendServer(object):
     """ This backend session represents a session of the backend Janus server """
 
     def __init__(self, name, url, status, session_timeout=0,
-                 location='', isp='', session_num=0, handle_num=0, expire=60, start_time=0):
+                 location='', isp='', session_num=0, handle_num=0, expire=60, start_time=0.0):
         self.name = name
         self.url = url
         self.status = status
@@ -40,7 +40,7 @@ class BackendServer(object):
 
 class BackendServerManager(object):
 
-    SERVER_EXPIRE_CHECK_INTERVAL = 60
+    SERVER_EXPIRE_CHECK_INTERVAL = 300
 
     def __init__(self, select_mode, static_server_list=[], server_dao=None, ):
 
@@ -161,7 +161,7 @@ class BackendServerManager(object):
             now = time.time()
             for server in self._server_dao.get_list():
                 if server.expire and now - server.utime >= server.expire:
-                    log.info('Backend Server {} ({}) expires'.format(server.name, server.url))
+                    log.info('Backend Server {} ({}) is removed for expiration '.format(server.name, server.url))
                     self._server_dao.del_by_name(server.name)
 
 

@@ -4,7 +4,6 @@ import copy
 from januscloud.common.error import JANUS_ERROR_SESSION_CONFLICT, JanusCloudError, JANUS_ERROR_CONFLICT, \
     JANUS_ERROR_NOT_FOUND
 
-SERVER_EXPIRED_CHECK_INTERVAL = 60
 
 class MemServerDao(object):
     def __init__(self):
