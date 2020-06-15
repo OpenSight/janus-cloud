@@ -90,7 +90,7 @@ def do_main(config):
         if janus_watcher:
             janus_watcher.start()
 
-        log.info('Janus Sentinel Started')
+        log.info('Janus Sentinel launched successfully')
 
         def stop_sentinel():
             log.info('Janus Proxy receives signals to quit...')
@@ -115,7 +115,7 @@ def do_main(config):
         log.info("Janus-sentinel Quit")
 
     except Exception:
-        log.exception('Failed to start Janus Sentinel')
+        log.exception('Fail to start Janus Sentinel')
         if janus_watcher:
             janus_watcher.destroy()
             janus_watcher = None

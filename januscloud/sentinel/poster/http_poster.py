@@ -28,7 +28,6 @@ class HttpPoster(BasicPoster):
             self._post_interval = self.expire / 3
         self._state_changed_event = Event()
         self._cur_index = 0
-        self._stat_updated = False
         self._post_session = requests.session()
 
     def _post_routine(self):
@@ -41,7 +40,6 @@ class HttpPoster(BasicPoster):
         self._state_changed_event.set()
 
     def on_stat_updated(self):
-        self._stat_updated = True
         self._state_changed_event.set()
 
     def post(self):
@@ -52,12 +50,11 @@ class HttpPoster(BasicPoster):
             'start_time': self._janus_server.start_time,
             'expire': self.expire,
         }
-        if self._stat_updated:
-            if self._janus_server.session_num >= 0:
-                data['session_num'] = self._janus_server.session_num
-            if self._janus_server.handle_num >= 0:
-                data['handle_num'] = self._janus_server.handle_num
-            self._stat_updated = False
+
+        if self._janus_server.session_num >= 0:
+            data['session_num'] = int(self._janus_server.session_num)
+        if self._janus_server.handle_num >= 0:
+            data['handle_num'] = int(self._janus_server.handle_num)
 
         for i in range(len(self.post_urls)):
             url = self.post_urls[self._cur_index]

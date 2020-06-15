@@ -30,16 +30,17 @@ janus:
   request_timeout: 10                   # how long to wait for reply from the monitored janus server, default is 10 secs
 
   hwm_threshold: 1                      # if the round-trip time of ping-pong is over hwm_threshold (unit: sec), mark
-                                        # this Janus server status HWM(High Water Mark), if hwm_threshold is 0, means
+                                        # this Janus server status HWM(High Water Mark). Default is 0, means
                                         # not enable hwm check
   admin_secret: ""                      # if non-empty, Sentinel includes this admin_secret for all admin API request.
                                         # Default is empty
 
 proc_watcher:
   cmdline: ""                           # command line to start up janus-server. default is empty, means not enable
-                                        # the process watcher of Sentinel
-  error_restart_interval: 30            # how many seconds to restart janus server after the old process exit with error
-                                        # default is 30
+                                        # the process watcher of Sentinel. If janus server process is launched and
+                                        # supervised by Sentinel, janus server must run in foreground (not as a daemon).
+  error_restart_interval: 10            # how many seconds to restart janus server after the old process exit with error
+                                        # default is 10
 
   poll_interval: 1                      # interval to check process status, default is 1
 
@@ -63,12 +64,12 @@ admin_api:
 
 posters:
   -
-    post_type: 'http'                                       # state poster type/protocl, only support 'http' by now
+    post_type: 'http'                                       # state poster type/protocol, only support 'http' by now
     name: ''
     post_urls: ["http://127.0.0.1:8100/sentinel_callback"]  # http url to post the current state, if there are multi urls,
                                                             # this poster would post to each by round robin mode
-    expire: 60                                              # thee expire time for each post. The poster would post the latest
-                                                            # status of the monitored janus-server at the interval of 1/3
+    expire: 60                                              # the expire time for each post. The poster would post the latest
+                                                            # state of the monitored janus-server at the interval of 1/3
                                                             # expire time. default is 60 seconds
     http_timeout: 10                                        # http request timeout, default is 10 sec
 

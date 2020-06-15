@@ -31,8 +31,8 @@ class JanusServer(object):
         if server_ip == '127.0.0.1':
             self.server_public_ip = get_host_ip()
         self.ws_port = ws_port
-        self.session_num = -1
-        self.handle_num = -1
+        self.session_num = -1   # unknown initially
+        self.handle_num = -1    # unknown initially
         self.start_time = 0
         self.status = JANUS_SERVER_STATUS_ABNORMAL
         self._in_maintenance = False
@@ -75,8 +75,8 @@ class JanusServer(object):
 
         self._poll_greenlet = None
         self._statistic_greenlet = None
-        self.session_num = 0
-        self.handle_num = 0
+        self.session_num = -1
+        self.handle_num = -1
         self.status = JANUS_SERVER_STATUS_ABNORMAL
         self._listeners.clear()
 
@@ -103,14 +103,20 @@ class JanusServer(object):
                 if hasattr(listener, 'on_status_changed') and callable(listener.on_status_changed):
                     listener.on_status_changed(new_status)
 
-    def update_stat(self, session_num, handle_num):
-        self.session_num = session_num
-        self.handle_num = handle_num
-        log.info('janus server({}) stat updated: session_num {}, handle_num {}'.format(
-            self.url, self.session_num, self.handle_num))
-        for listener in self._listeners:
-            if hasattr(listener, 'on_stat_updated') and callable(listener.on_stat_updated):
-                listener.on_stat_updated()
+    def set_stat(self, session_num, handle_num):
+        stat_updated = False
+        if self.session_num != session_num:
+            stat_updated = True
+            self.session_num = session_num
+        if self.handle_num != handle_num:
+            stat_updated = True
+            self.handle_num = handle_num
+        if stat_updated:
+            log.info('janus server({}) stat updated: session_num {}, handle_num {}'.format(
+                self.url, self.session_num, self.handle_num))
+            for listener in self._listeners:
+                if hasattr(listener, 'on_stat_updated') and callable(listener.on_stat_updated):
+                    listener.on_stat_updated()
 
     def register_listener(self, listener):
         self._listeners.append(listener)
@@ -167,7 +173,7 @@ class JanusServer(object):
                 response = self.send_request(self._admin_ws_client,
                                              create_janus_msg('list_handles', session_id=session_id, **common_args))
                 handles.extend(response.get('handles', []))
-            self.update_stat(session_num=len(sessions), handle_num=len(handles))
+            self.set_stat(session_num=len(sessions), handle_num=len(handles))
         except Exception as e:
             log.warning('calculate stat of janus server({}) failed: {}'.format(self.admin_url, e))
             if self._admin_ws_client:
@@ -239,7 +245,6 @@ class JanusServer(object):
             if self._has_destroy:
                 break
             self.query_stat()
-
 
     def on_process_status_change(self, watcher):
         log.debug('on_process_status_change is called, new status: {}'.format(watcher.process_status))
