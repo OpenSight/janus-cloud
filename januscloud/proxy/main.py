@@ -40,6 +40,7 @@ def do_main(config):
     log = logging.getLogger(__name__)
 
     try:
+        log.info('Janus Proxy is starting...')
         cert_pem_file = config['certificates'].get('cert_pem')
         cert_key_file = config['certificates'].get('cert_key')
 
@@ -130,7 +131,7 @@ def do_main(config):
             )
             server_list.append(ws_server)
 
-        log.info('Started Janus Proxy')
+        log.info('Janus Proxy launched successfully')
 
         def stop_server():
             log.info('Janus Proxy receives signals to quit...')
@@ -146,7 +147,7 @@ def do_main(config):
         log.info("Janus-proxy Quit")
 
     except Exception:
-        log.exception('Failed to start Janus Proxy')
+        log.exception('Fail to start Janus Proxy')
 
 
 def serve_forever(server_list):
