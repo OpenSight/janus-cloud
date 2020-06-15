@@ -1700,7 +1700,7 @@ class VideoRoomManager(object):
 
 
 class VideoRoomBackendSweeper(object):
-    LIST_CHECK_INTERVAL = 10
+    LIST_CHECK_INTERVAL = 60 # 10
 
     def __init__(self, backend_server_mgr, idle_room_check_interval=600):
         self._backend_server_mgr = backend_server_mgr
