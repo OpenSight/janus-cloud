@@ -52,7 +52,7 @@ config_schema = Schema({
         AutoDel(str): object  # for all other key we don't care
     }, default={}),
     Optional("janus_server"): Default([{
-        "name": StrRe('^\w{1,64}$'),
+        "name": StrRe('^[\w-]{1,64}$'),
         "url": StrRe('^(ws|wss)://\S+$'),
         Optional("status"): Default(IntVal(values=(0, 1)), default=0),
         Optional("session_timeout"): Default(IntVal(min=0, max=86400), default=60),
@@ -69,7 +69,7 @@ def load_conf(path):
     if path is None or path == '':
         config = config_schema.validate({})
     else:
-        log.info('Janus-proxy loads the config file: {}'.format(os.path.abspath(path)))
+        print('Janus-proxy loads the config file: {}'.format(os.path.abspath(path)))
         config = parse_config(path, config_schema)
 
     # set up the default cert pathname
