@@ -2,6 +2,7 @@
 import logging
 from januscloud.common.utils import to_redis_hash
 from januscloud.proxy.core.backend_server import BackendServer
+from redis import RedisError
 log = logging.getLogger(__name__)
 
 """
@@ -14,12 +15,17 @@ class RDServerDao(object):
 
     def __init__(self, redis_client=None):
         self._redis_client = redis_client
+        self._redis_client.client_getname()     # test the connection if available or not
 
     def get_by_name(self, server_name):
-        rd_server = self._redis_client.hgetall(self._key_server(server_name))
-        if rd_server:
-            return self._from_rd_server(rd_server)
-        else:
+        try:
+            rd_server = self._redis_client.hgetall(self._key_server(server_name))
+            if rd_server:
+                return self._from_rd_server(rd_server)
+            else:
+                return None
+        except RedisError as e:
+            log.warning('Fail to get backend server {} info because of Redis client error: {}'.format(server_name, e))
             return None
 
     def del_by_name(self, server_name):
@@ -47,15 +53,29 @@ class RDServerDao(object):
 
     def get_list(self):
         server_list = []
-        server_key_list = self._redis_client.keys(pattern='januscloud:backend_servers:*')
-        for server_key in server_key_list:
-            rd_server = self._redis_client.hgetall(server_key)
-            if rd_server:
-                server_list.append(self._from_rd_server(rd_server))
+        try:
+            server_key_list = self._redis_client.keys(pattern='januscloud:backend_servers:*')
+            start = 0
+            step = 32
+            total = len(server_key_list)
+            while True:
+                with self._redis_client.pipeline() as p:
+                    for server_key in server_key_list[start:start+step]:
+                        p.hgetall(server_key)
+                    result = p.execute()
+                    for rd_server in result:
+                        if rd_server:
+                            server_list.append(self._from_rd_server(rd_server))
+                start += step
+                if start >= total:
+                    break
+        except RedisError as e:
+            log.warning('Fail to get backend server list because of Redis client error: {}'.format(e))
+
         return server_list
 
     @staticmethod
-    def _key_server(self, server_name):
+    def _key_server(server_name):
         return 'januscloud:backend_servers:{0}'.format(server_name)
 
     @staticmethod

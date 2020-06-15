@@ -18,10 +18,12 @@ general:
                                         # risk having orphaned sessions (sessions not
                                         # controlled by any transport and never freed).
                                         # To avoid timeouts, keep-alives can be used.  
-  server_db: "memory"                   # the url of the database storing the backend Janus
-                                        # server info. Now only support memory type.
-                                        # the url for memory db is "memory", the url for redis is
-                                        # prefix by "redis://" schema. default is memory
+  server_db: "memory"                   # the url of the database storing the backend Janus server info.
+                                        # Now only support memory or redis type.
+                                        # the url for memory db is: "memory",
+                                        # the url for redis is according to
+                                        # <https://www.iana.org/assignments/uri-schemes/prov/rediss>, for example:
+                                        #      "redis://user:secret@localhost:6379/0" schema. default is memory
   server_select: "rr"                   # select algorithm for backend Janus server, now support "rr" (round robin),
                                         # "rand" (random), "lb" (load balance), "wr"(weighted random) and the
                                         # thirdparty method.
@@ -47,8 +49,8 @@ log:
 
 # Certificate and key to use for WSS and HTTPS (and passphrase if needed).
 certificates:
-  cert_pem: "/opt/ssl2/server.crt"
-  cert_key: "/opt/ssl2/server.key"
+  cert_pem: "/opt/janus-cloud/certs/mycert.pem"
+  cert_key: "/opt/janus-cloud/certs/mycert.key"
 
 
 # You can choose which of the available plugins should be
@@ -75,7 +77,7 @@ ws_transport:
   ws: true                          # Whether to enable the WebSockets API
   ws_listen: '0.0.0.0:8288'         # WebSockets server listen addr
 
-  wss: true                        # Whether to enable secure WebSockets
+  wss: false                        # Whether to enable secure WebSockets
   wss_listen: '0.0.0.0:8289'       # WebSockets server secure listen addr, if enabled
 
   max_greenlet_num: 1024            # size of the greenlet pool for this transport, 0 means not limited
@@ -83,7 +85,7 @@ ws_transport:
 # Configuration about the RESTful api of janus-proxy. janus-proxy provide an other set of RESTful API for admin  
 admin_api:
   json: "indented"                  # Whether the JSON messages should be indented (default),
-  # plain (no indentation) or compact (no indentation and no spaces)
+                                    # plain (no indentation) or compact (no indentation and no spaces)
   http_listen: '0.0.0.0:8100'       # REST API server listen addr
 
 

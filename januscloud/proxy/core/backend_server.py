@@ -76,7 +76,7 @@ class BackendServerManager(object):
             server.url = url
             server.status = status
             for (k, v) in kwargs.items():
-                if k in ("session_timeout", "location", "isp", "session_num", "handle_num", "expire"):
+                if k in ("session_timeout", "location", "isp", "session_num", "handle_num", "expire", "start_time"):
                     setattr(server, k, v)
             server.utime = time.time()
             self._server_dao.update(server)
@@ -162,7 +162,13 @@ class BackendServerManager(object):
             for server in self._server_dao.get_list():
                 if server.expire and now - server.utime >= server.expire:
                     log.info('Backend Server {} ({}) is removed for expiration '.format(server.name, server.url))
-                    self._server_dao.del_by_name(server.name)
+                    try:
+                        self._server_dao.del_by_name(server.name)
+                    except Exception as e:
+                        log.warning('Fail to remove backend server {}: {}'.format(server.name, e))
+                        pass
+
+
 
 
 if __name__ == '__main__':
