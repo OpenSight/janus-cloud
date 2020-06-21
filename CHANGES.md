@@ -3,7 +3,7 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
- [v0.3.0]  - unreleased
+ [v0.3.0]  - 2020-06-21
 ---------------------------------
 
 * add rtp_forward operations to the admin API of videoroom plugin
