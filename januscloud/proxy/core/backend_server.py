@@ -168,9 +168,6 @@ class BackendServerManager(object):
                         log.warning('Fail to remove backend server {}: {}'.format(server.name, e))
                         pass
 
-
-
-
 if __name__ == '__main__':
     pass
 

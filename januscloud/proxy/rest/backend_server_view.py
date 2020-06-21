@@ -7,6 +7,7 @@ from januscloud.common.schema import Schema, Optional, DoNotCare, \
     FloatVal, AutoDel, StrVal, EnumVal
 from pyramid.response import Response
 
+
 def includeme(config):
     config.add_route('sentinel_callback', '/sentinel_callback')
     config.add_route('backend_server_list', '/backend_servers')

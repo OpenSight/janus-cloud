@@ -38,7 +38,8 @@ class RDServerDao(object):
                 server_key,
                 to_redis_hash(server),
             )
-            p.expire(server_key, server.expire)
+            if server.expire != 0:
+                p.expire(server_key, server.expire)
             p.execute()
 
     def update(self, server):
@@ -48,7 +49,8 @@ class RDServerDao(object):
                 server_key,
                 to_redis_hash(server),
             )
-            p.expire(server_key, server.expire)
+            if server.expire != 0:
+                p.expire(server_key, server.expire)
             p.execute()
 
     def get_list(self):
