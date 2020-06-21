@@ -97,6 +97,7 @@ class JanusServer(object):
             return  # ignore state change when maintaining
         old_status = self.status
         self.status = new_status
+
         if old_status != new_status:
             log.info('janus server({}) status changed to {}'.format(self.url, new_status))
             for listener in self._listeners:
@@ -114,9 +115,10 @@ class JanusServer(object):
         if stat_updated:
             log.info('janus server({}) stat updated: session_num {}, handle_num {}'.format(
                 self.url, self.session_num, self.handle_num))
-            for listener in self._listeners:
-                if hasattr(listener, 'on_stat_updated') and callable(listener.on_stat_updated):
-                    listener.on_stat_updated()
+            if session_num >= 0 or handle_num >= 0:
+                for listener in self._listeners:
+                    if hasattr(listener, 'on_stat_updated') and callable(listener.on_stat_updated):
+                        listener.on_stat_updated()
 
     def register_listener(self, listener):
         self._listeners.append(listener)
@@ -176,6 +178,7 @@ class JanusServer(object):
             self.set_stat(session_num=len(sessions), handle_num=len(handles))
         except Exception as e:
             log.warning('calculate stat of janus server({}) failed: {}'.format(self.admin_url, e))
+            self.set_stat(session_num=-1, handle_num=-1)   # stop post statistic
             if self._admin_ws_client:
                 try:
                     self._admin_ws_client.close()
