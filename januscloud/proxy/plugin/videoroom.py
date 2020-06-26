@@ -2015,11 +2015,11 @@ class VideoRoomHandle(FrontendHandleBase):
             if allowed_params['action'] == 'enable':
                 room.enable_allowed()
             elif allowed_params['action'] == 'disable':
-                room.disable_allowd()
+                room.disable_allowed()
             elif allowed_params['action'] == 'add':
-                room.add_allowd(allowed_params.get('allowed', []))
+                room.add_allowed(allowed_params.get('allowed', []))
             elif allowed_params['action'] == 'remove':
-                room.remove_allowd(allowed_params.get('allowed', []))
+                room.remove_allowed(allowed_params.get('allowed', []))
             else:
                 raise JanusCloudError("Unsupported action '{}' (allowed)".format(allowed_params['action']),
                                       JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
