@@ -2741,7 +2741,7 @@ def post_videoroom_tokens(request):
     if allowed_params['action'] == 'enable':
         room.enable_allowed()
     elif allowed_params['action'] == 'disable':
-        room.disable_allowd()
+        room.disable_allowed()
     elif allowed_params['action'] == 'add':
         room.add_allowed(allowed_params.get('allowed', []))
     elif allowed_params['action'] == 'remove':
@@ -2751,7 +2751,7 @@ def post_videoroom_tokens(request):
                               JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
     reply = {
         'videoroom': 'success',
-        'room': room_base_info['room']
+        'room': room_id
     }
     if allowed_params['action'] != 'disable':
         reply['allowed'] = list(room.allowed)
