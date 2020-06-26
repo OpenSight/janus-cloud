@@ -3,6 +3,10 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
+ [v0.4.0]  - unreleased
+---------------------------------
+
+
  [v0.3.0]  - 2020-06-21
 ---------------------------------
 
