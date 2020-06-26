@@ -1576,6 +1576,9 @@ class VideoRoomManager(object):
         if not new_room.is_private:
             self._public_rooms_list.append(new_room)
 
+        if 'allowed' in room_params:  # if allowed list is given in params, enable this room check allow by default
+            new_room.check_allowed = True
+
         # debug print the new room info
         log.debug('Created videoroom: {0} ({1}, private: {2}, {3}/{4} codecs, secret: {5}, pin: {6}, pvtid:{7})'.format(
             new_room.room_id, new_room.description, new_room.is_private,
@@ -2564,6 +2567,7 @@ class VideoRoomPlugin(PluginBase):
                 Optional('rec_dir'): StrVal(),
                 Optional('lock_record'): BoolVal(),
                 Optional('notify_joining'): BoolVal(),
+                AutoDel(str): object  # for all other key we don't care
             }], default=[]),
             DoNotCare(str): object  # for all other key we don't care
 
@@ -2738,9 +2742,9 @@ def post_videoroom_tokens(request):
     elif allowed_params['action'] == 'disable':
         room.disable_allowd()
     elif allowed_params['action'] == 'add':
-        room.add_allowd(allowed_params.get('allowed', []))
+        room.add_allowed(allowed_params.get('allowed', []))
     elif allowed_params['action'] == 'remove':
-        room.remove_allowd(allowed_params.get('allowed', []))
+        room.remove_allowed(allowed_params.get('allowed', []))
     else:
         raise JanusCloudError("Unsupported action '{}' (allowed)".format(allowed_params['action']),
                               JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
