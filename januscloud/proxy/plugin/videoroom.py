@@ -1193,7 +1193,7 @@ class VideoRoom(object):
                  bitrate_cap=False, fir_freq=0, audiocodec=['opus'], videocodec=['vp8'], opus_fec=False,
                  video_svc=False, audiolevel_ext=True, audiolevel_event=False, audio_active_packets=100,
                  audio_level_average=25, videoorient_ext=True, playoutdelay_ext=True,
-                 transport_wide_cc_ext=False, record=False, rec_dir='', check_allowed=False, allowed=set(),
+                 transport_wide_cc_ext=False, record=False, rec_dir='', allowed=None,
                  notify_joining=False, lock_record=False,
                  vp9_profile='', h264_profile='',
                  utime=None, ctime=None):
@@ -1243,8 +1243,12 @@ class VideoRoom(object):
                                                             # negotiated or not for new publishers
         self.record = record                     # Whether the feeds from publishers in this room should be recorded
         self.rec_dir = rec_dir                   # Where to save the recordings of this room, if enabled
-        self.check_allowed = check_allowed       # Whether to check tokens when participants join (see below)
-        self.allowed = allowed                   # Map of participants (as tokens) allowed to join
+        self.check_allowed = False               # Whether to check tokens when participants join, default is False
+        if allowed is None:
+            self.allowed = set()                 # Map of participants (as tokens) allowed to join
+        else:
+            self.allowed = set(allowed)
+            self.check_allowed = True       # if allowed is given in params, enable this room check allow by default
         self.notify_joining = notify_joining     # Whether an event is sent to notify all participants if a new
                                                  # participant joins the room
         self.lock_record = lock_record           # Whether recording state can only be changed providing the room secret
@@ -1575,9 +1579,6 @@ class VideoRoomManager(object):
             raise
         if not new_room.is_private:
             self._public_rooms_list.append(new_room)
-
-        if 'allowed' in room_params:  # if allowed list is given in params, enable this room check allow by default
-            new_room.check_allowed = True
 
         # debug print the new room info
         log.debug('Created videoroom: {0} ({1}, private: {2}, {3}/{4} codecs, secret: {5}, pin: {6}, pvtid:{7})'.format(
