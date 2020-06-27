@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 
  [v0.4.0]  - unreleased
 ---------------------------------
+* Added support for audio level feature for videoroom
 
 
  [v0.3.0]  - 2020-06-21

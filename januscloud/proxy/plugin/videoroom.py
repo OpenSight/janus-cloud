@@ -98,7 +98,7 @@ room_params_schema = Schema({
     Optional('audiolevel_ext'): BoolVal(),
     Optional('audiolevel_event'): BoolVal(),
     Optional('audio_active_packets'): IntVal(min=1),
-    Optional('audio_level_average'): IntVal(min=0, max=127),
+    Optional('audio_level_average'): IntVal(min=1, max=127),
     Optional('videoorient_ext'): BoolVal(),
     Optional('playoutdelay_ext'): BoolVal(),
     Optional('transport_wide_cc_ext'): BoolVal(),
@@ -199,6 +199,8 @@ publisher_configure_schema = Schema({
     Optional('secret'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
     Optional('update'): BoolVal(),
+    Optional('audio_active_packets'): IntVal(min=1),
+    Optional('audio_level_average'): IntVal(min=1, max=127),
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -213,6 +215,8 @@ publisher_publish_schema = Schema({
     Optional('filename'): StrVal(max_len=256),
     Optional('secret'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
+    Optional('audio_active_packets'): IntVal(min=1),
+    Optional('audio_level_average'): IntVal(min=1, max=127),
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -608,6 +612,8 @@ class VideoRoomPublisher(object):
         self.data_active = True
         self.simulcast = False
         self.audiolevel_ext = False
+        self.user_audio_active_packets = 0  # Participant's audio_active_packets overwriting global room setting
+        self.user_audio_level_average = 0  # Participant's audio_level_average overwriting global room setting
         self.pvt_id = 0     # This is sent to the publisher for mapping purposes, but shouldn't be shared with others
 
         self._rtp_forwarders = {}
@@ -799,6 +805,7 @@ class VideoRoomPublisher(object):
                 record=None, filename='',
                 display='',
                 secret='',
+                audio_active_packets=0, audio_level_average=0,
                 jsep=None,
                 **kwargs):
         self._assert_valid()
@@ -812,6 +819,7 @@ class VideoRoomPublisher(object):
                               record=record, filename=filename,
                               display=display,
                               secret=secret,
+                              audio_active_packets=audio_active_packets, audio_level_average=audio_level_average,
                               jsep=jsep,
                               **kwargs)
 
@@ -820,6 +828,7 @@ class VideoRoomPublisher(object):
                   bitrate=-1, keyframe=False,
                   record=None, filename='',
                   secret='',
+                  audio_active_packets=0, audio_level_average=0,
                   display='', update=False,
                   jsep=None,
                   **kwargs):
@@ -878,6 +887,10 @@ class VideoRoomPublisher(object):
             body['filename'] = filename
         if display:
             body['display'] = display
+        if audio_active_packets:
+            body['audio_active_packets'] = audio_active_packets
+        if audio_level_average:
+            body['audio_level_average'] = audio_level_average
         if len(kwargs) > 0:
             for k, v in kwargs.items():
                 if k not in body:
@@ -902,7 +915,7 @@ class VideoRoomPublisher(object):
         if jsep:
             sdp = jsep.get('sdp', '')
             if sdp:
-                if JANUS_RTP_EXTMAP_AUDIO_LEVEL in sdp:
+                if self.room.audiolevel_ext and JANUS_RTP_EXTMAP_AUDIO_LEVEL in sdp:
                     self.audiolevel_ext = True
                 else:
                     self.audiolevel_ext = False
@@ -924,6 +937,14 @@ class VideoRoomPublisher(object):
             self.data_active = data
             log.debug('Setting data property: {} (room {}, user {})'.format(
                 data, self.room_id, self.user_id))
+        if audio_active_packets:
+            self.user_audio_active_packets = audio_active_packets
+            log.debug('Setting user audio_active_packet: {} (room {}, user {})'.format(
+                audio_active_packets, self.room_id, self.user_id))
+        if audio_level_average:
+            self.user_audio_level_average = audio_level_average
+            log.debug('Setting user audio_level_average: {} (room {}, user {})'.format(
+                audio_level_average, self.room_id, self.user_id))
 
         if display:
             self.display = display
@@ -1107,6 +1128,19 @@ class VideoRoomPublisher(object):
             if op == 'slow_link':
                 if self._frontend_handle:
                     self._frontend_handle.push_plugin_event(data, jsep)
+            if op == 'talking' or op =='stopped-talking':
+                if op == 'talking':
+                    self.talking = True
+                else:
+                    self.talking = False
+                if self.room is not None and self.room.audiolevel_event:
+                    talk_event = data.copy()
+                    talk_event['id'] = self.user_id
+                    talk_event['room'] = self.room_id
+                    if self._frontend_handle:
+                        self._frontend_handle.push_plugin_event(talk_event)
+                    if self.room:
+                        self.room.notify_other_participants(self, talk_event)
             else:
                 # ignore other operations
                 return
@@ -1148,6 +1182,8 @@ class VideoRoomPublisher(object):
                 self.simulcast = False
                 self.talking = False
                 self.sdp = ''
+                self.user_audio_active_packets = 0
+                self.user_audio_level_average = 0
 
                 # notify other participant unpublished
                 unpub_event = {
@@ -1273,7 +1309,6 @@ class VideoRoom(object):
             self.ctime = time.time()
         else:
             self.ctime = ctime
-
 
     def __str__(self):
         return 'Video Room-"{0}"({1})'.format(self.room_id, self.description)
@@ -1471,7 +1506,9 @@ class VideoRoom(object):
             if publisher != src_participant:
                 try:
                     publisher.push_videoroom_event(event)
-                except Exception:
+                except Exception as e:
+                    log.warning('Notify publisher {} ({}) of room {} Failed:{}'.format(
+                        publisher.user_id, publisher.display, self.room_id, e))
                     pass     # ignore errors during push event to each publisher
 
     def enable_allowed(self):
@@ -2258,6 +2295,11 @@ class VideoRoomHandle(FrontendHandleBase):
                             }
                             if attendees is not None:
                                 reply_event['attendees'] = attendees
+                            if new_publisher.user_audio_active_packets:
+                                reply_event['audio_active_packets'] = new_publisher.user_audio_active_packets
+                            if new_publisher.user_audio_level_average:
+                                reply_event['user_audio_level_average'] = new_publisher.user_audio_level_average
+
                         except Exception:
                             if new_publisher:
                                 new_publisher.destroy()
