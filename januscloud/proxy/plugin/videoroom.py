@@ -106,6 +106,7 @@ room_params_schema = Schema({
     Optional('rec_dir'): StrVal(max_len=1024),
     Optional('notify_joining'): BoolVal(),
     Optional('lock_record'): BoolVal(),
+    Optional('require_e2ee'): BoolVal(),
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -743,6 +744,7 @@ class VideoRoomPublisher(object):
                 'record': self.room.record,
                 'rec_dir': self.room.rec_dir,
                 'notify_joining': False,
+                'require_e2ee': self.room.require_e2ee,
             }
             if self.display:
                 body['description'] = 'januscloud-{}'.format(self.display)
@@ -1230,7 +1232,7 @@ class VideoRoom(object):
                  video_svc=False, audiolevel_ext=True, audiolevel_event=False, audio_active_packets=100,
                  audio_level_average=25, videoorient_ext=True, playoutdelay_ext=True,
                  transport_wide_cc_ext=False, record=False, rec_dir='', allowed=None,
-                 notify_joining=False, lock_record=False,
+                 notify_joining=False, lock_record=False, require_e2ee=False,
                  vp9_profile='', h264_profile='',
                  utime=None, ctime=None):
 
@@ -1291,6 +1293,8 @@ class VideoRoom(object):
 
         self.h264_profile = h264_profile         # H.264 codec profile to prefer, if more are negotiated
         self.vp9_profile = vp9_profile           # VP9 codec profile to prefer, if more are negotiated
+
+        self.require_e2ee = require_e2ee         # Whether end-to-end encrypted publishers are required
 
         #internal property
         self._participants = {}                  # Map of potential publishers (we get subscribers from them)
@@ -1625,6 +1629,8 @@ class VideoRoomManager(object):
         ))
         if new_room.record:
             log.debug('  -- Room is going to be recorded in {}'.format(new_room.rec_dir))
+        if new_room.require_e2ee:
+            log.debug('  -- All publishers MUST use end-to-end encryption')
 
         return new_room
 
@@ -2016,7 +2022,7 @@ class VideoRoomHandle(FrontendHandleBase):
                     'videoorient_ext': room.videoorient_ext,
                     'playoutdelay_ext': room.playoutdelay_ext,
                     'transport_wide_cc_ext': room.transport_wide_cc_ext,
-
+                    'require_e2ee': room.require_e2ee,
                 }
                 if room.bitrate_cap:
                     room_info['bitrate_cap'] = True
@@ -2610,6 +2616,7 @@ class VideoRoomPlugin(PluginBase):
                 Optional('rec_dir'): StrVal(),
                 Optional('lock_record'): BoolVal(),
                 Optional('notify_joining'): BoolVal(),
+                Optional('require_e2ee'): BoolVal(),
                 AutoDel(str): object  # for all other key we don't care
             }], default=[]),
             DoNotCare(str): object  # for all other key we don't care
