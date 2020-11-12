@@ -89,7 +89,7 @@ room_params_schema = Schema({
         ['opus', 'multiopus', 'g722', 'pcmu', 'pcma', 'isac32', 'isac16']
     )),
     Optional('videocodec'): ListVal(EnumVal(
-        ['vp8', 'vp9', 'h264']
+        ['vp8', 'vp9', 'h264', 'av1', 'h265']
     )),
     Optional('vp9_profile'): StrVal(max_len=256),
     Optional('h264_profile'): StrVal(max_len=256),
@@ -1544,13 +1544,13 @@ class VideoRoom(object):
 
     def check_modify(self, secret):
         if self.secret and self.secret != secret:
-            raise JanusCloudError('Unauthorized (wrong {})'.format(secret),
+            raise JanusCloudError('Unauthorized (wrong {})'.format('secret'),
                                   JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
         return self
 
     def check_join(self, pin):
         if self.pin and self.pin != pin:
-            raise JanusCloudError('Unauthorized (wrong {})'.format(pin),
+            raise JanusCloudError('Unauthorized (wrong {})'.format('pin'),
                                   JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
         return self
 
@@ -1596,7 +1596,7 @@ class VideoRoomManager(object):
                 raise JanusCloudError('Need admin key for creating room',
                                       JANUS_VIDEOROOM_ERROR_MISSING_ELEMENT)
             if admin_key != self._admin_key:
-                raise JanusCloudError('Unauthorized (wrong {})'.format(admin_key),
+                raise JanusCloudError('Unauthorized (wrong {})'.format('admin_key'),
                                       JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
         if room_id == 0:
@@ -1688,7 +1688,7 @@ class VideoRoomManager(object):
         # check admin_key is correct, then list the private room
         if self._admin_key and admin_key:
             if admin_key != self._admin_key:
-                raise JanusCloudError('Unauthorized (wrong {})'.format(admin_key),
+                raise JanusCloudError('Unauthorized (wrong {})'.format('admin_key'),
                                       JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
             else:
                 room_list = list(self._rooms_map.values())
@@ -2129,7 +2129,7 @@ class VideoRoomHandle(FrontendHandleBase):
                self._plugin.config['general']['admin_key']:
                 admin_key = body.get('admin_key', '')
                 if admin_key != self._plugin.config['general']['admin_key']:
-                    raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+                    raise JanusCloudError("Unauthorized (wrong {})".format('admin_key'),
                                           JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
             room_base_info = room_base_schema.validate(body)
@@ -2157,7 +2157,7 @@ class VideoRoomHandle(FrontendHandleBase):
                self._plugin.config['general']['admin_key']:
                 admin_key = body.get('admin_key', '')
                 if admin_key != self._plugin.config['general']['admin_key']:
-                    raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+                    raise JanusCloudError("Unauthorized (wrong {})".format('admin_key'),
                                           JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
             room_base_info = room_base_schema.validate(body)
@@ -2594,7 +2594,7 @@ class VideoRoomPlugin(PluginBase):
                 Optional('bitrate_cap'): BoolVal(),
                 Optional('fir_freq'): IntVal(min=0),
                 Optional('audiocodec'): ListVal(EnumVal(['opus', 'multiopus', 'g722', 'pcmu', 'pcma', 'isac32', 'isac16'])),
-                Optional('videocodec'): ListVal(EnumVal(['vp8', 'vp9', 'h264'])),
+                Optional('videocodec'): ListVal(EnumVal(['vp8', 'vp9', 'h264', 'av1', 'h265'])),
                 Optional('vp9_profile'): StrVal(max_len=256),
                 Optional('h264_profile'): StrVal(max_len=256),
                 Optional('opus_fec'): BoolVal(),
@@ -2880,7 +2880,7 @@ def post_videoroom_forwarder_list(request):
             plugin.config['general']['admin_key']:
         admin_key = params.get('admin_key', '')
         if admin_key != plugin.config['general']['admin_key']:
-            raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+            raise JanusCloudError("Unauthorized (wrong {})".format('admin_key'),
                                   JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
     room_base_info = room_base_schema.validate(params)
@@ -2911,7 +2911,7 @@ def delete_videoroom_forwarder_list(request):
             plugin.config['general']['admin_key']:
         admin_key = params.get('admin_key', '')
         if admin_key != plugin.config['general']['admin_key']:
-            raise JanusCloudError("Unauthorized (wrong {})".format(admin_key),
+            raise JanusCloudError("Unauthorized (wrong {})".format('admin_key'),
                                   JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
     room_base_info = room_base_schema.validate(params)
