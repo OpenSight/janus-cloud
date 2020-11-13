@@ -84,7 +84,7 @@ $(document).ready(function() {
 						// Attach to VideoCall plugin
 						janus.attach(
 							{
-								plugin: "janus.plugin.videocall",
+								plugin: "janus.plugin.p2pcall",
 								opaqueId: opaqueId,
 								success: function(pluginHandle) {
 									$('#details').remove();
