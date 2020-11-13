@@ -37,10 +37,13 @@ JANUS_P2PCALL_ERROR_USE_ECHO_TEST = 479
 JANUS_P2PCALL_ERROR_NO_CALL = 481
 JANUS_P2PCALL_ERROR_MISSING_SDP = 482
 
+JANUS_P2PCALL_API_SYNC_VERSION = 'v0.10.7(2020-10-30)'
 JANUS_P2PCALL_VERSION = 6
 JANUS_P2PCALL_VERSION_STRING = '0.0.6'
 JANUS_P2PCALL_DESCRIPTION = 'This is a simple P2P video call plugin for Janus-cloud, ' \
-                                'allow two WebRTC peer communicate with each other in P2P mode'
+                                'allow two WebRTC peer communicate with each other in P2P mode. ' \
+                                'Its API is kept sync with videocall of Janus-gateway until ' + \
+                                JANUS_P2PCALL_API_SYNC_VERSION
 JANUS_P2PCALL_NAME = 'JANUS P2PCall plugin'
 JANUS_P2PCALL_AUTHOR = 'opensight.cn'
 JANUS_P2PCALL_PACKAGE = 'janus.plugin.p2pcall'

@@ -44,7 +44,7 @@ JANUS_VIDEOCALL_VERSION = 6
 JANUS_VIDEOCALL_VERSION_STRING = '0.0.6'
 JANUS_VIDEOCALL_DESCRIPTION = 'This is a a simple video call plugin for Janus-cloud, ' \
                                 'which allow two WebRTC peer communicate with each other through Janus server. ' \
-                              'Its API is kept sync with videocall of Janus-server until ' + \
+                              'Its API is kept sync with videocall of Janus-gateway until ' + \
                               JANUS_VIDEOCALL_API_SYNC_VERSION
 JANUS_VIDEOCALL_NAME = 'JANUS VideoCall plugin'
 JANUS_VIDEOCALL_AUTHOR = 'opensight.cn'

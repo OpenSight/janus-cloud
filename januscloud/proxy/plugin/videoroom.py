@@ -56,7 +56,7 @@ JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.10.7(2020-10-30)'
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
 JANUS_VIDEOROOM_DESCRIPTION = 'This is a plugin implementing a videoconferencing SFU for Janus-cloud, ' \
-                              'that is an audio/video router whose API is kept sync with videoroom of Janus-server ' \
+                              'that is an audio/video router whose API is kept sync with videoroom of Janus-gateway ' \
                               'until ' + JANUS_VIDEOROOM_API_SYNC_VERSION
 JANUS_VIDEOROOM_NAME = 'JANUS VideoRoom plugin'
 JANUS_VIDEOROOM_AUTHOR = 'opensight.cn'
