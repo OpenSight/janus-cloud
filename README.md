@@ -7,8 +7,10 @@ Janus-cloud is an Janus API proxy to create the Janus WebRTC server cluster, whi
 -----------------
 
 Janus is an excellent WebRTC server, simple and well-structured. Its pluggable design and sophisticated API is impressive and amazing. But it also comes with some disadvantage.
-First, Janus is design to be a standalone server, which cannot be scale to support the huge RTC workload. But in the cloud-based environment, scalability is essential. With the help of Janus-cloud, engineers can easily build a large and scalable cluster system of WebRTC server. 
-Second, Janus processes the WebRTC signalling, as well as the media data. But in the real communication world, signalling and media are usually divided into two plane, so that more flexibility can be provided. Janus-cloud fulfills this requirement by handling the signalling only and leaving media to Janus-server. Janus-cloud is developed by Python3 language which is more suitable to deal with the signalling, in the other hand, C language, which is used by Janus server, is more suitable to transmit media data in an efficient way . 
+
+First, Janus is design to be a standalone server, which cannot be scale to support the huge RTC workload. But in the cloud-based environment, scalability is essential. With the help of Janus-cloud, engineers can easily build a large and scalable cluster system of WebRTC server.
+
+Second, Janus processes the WebRTC signalling, as well as the media data. But in the real communication world, signalling and media are usually divided into two plane, so that more flexibility can be provided. Janus-cloud fulfills this requirement by handling the signalling only and leaving media to Janus-server. Janus-cloud is developed by Python3 language which is more suitable to deal with the signalling, in the other hand, C language, which is used by Janus server, is more suitable to transmit media data in an efficient way .
 
 
 2 Features
@@ -59,15 +61,16 @@ This is a trivial EchoTest plugin which is only used for test and show plugin in
 ### videocall
 
 This is a simple video call plugin which allow two WebRTC peer communicate with each other through the medium Janus server. It achieves the same function and outputs the same APIs with the videocall plugin of Janus server, as well as it can distribute the workload among the backend Janus servers.
+
 Moreover, Janus-proxy also can be scaled out for videocall plugin to handle much more video calls. Different WebRTC peers may be assigned to different Janus-proxies which is able to communicates with each other through admin interface.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v0.9.2.
+Its APIs is compatible with the videocall plugin of Janus-gateway util v0.10.7(2020-10-30).
 
 ### p2pcall
 
 This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janus-proxy be able to scaled out to handle more video call. However no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v0.9.2.
+Its APIs is compatible with the videocall plugin of Janus-gateway util v0.10.7(2020-10-30).
 
 ### videoroom
 
@@ -77,7 +80,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - subscriber switch not support
 - string_ids not support
 
-Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.9.5.
+Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.10.7(2020-10-30).
 
 5 Topology
 -----------------
