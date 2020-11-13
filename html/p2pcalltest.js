@@ -80,6 +80,11 @@ $(document).ready(function() {
 			janus = new Janus(
 				{
 					server: server,
+					//iceServers: [{
+                    //      urls: "turn:52.83.104.136",
+                    //      username: "test",
+                    //      credential: "1234"
+                    //}],					
 					success: function() {
 						// Attach to VideoCall plugin
 						janus.attach(
