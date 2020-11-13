@@ -51,7 +51,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.9.5(2020-05-24)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.10.7(2020-10-30)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -152,6 +152,7 @@ rtp_forward_schema = Schema({
     Optional('video_ssrc'): IntVal(min=0),
     Optional('video_pt'): IntVal(min=0),
     Optional('video_rtcp_port'): IntVal(min=0, max=65535),
+    Optional('simulcast'): BoolVal(),
     Optional('video_port_2'): IntVal(min=0, max=65535),
     Optional('video_ssrc_2'): IntVal(min=0),
     Optional('video_pt_2'): IntVal(min=0),

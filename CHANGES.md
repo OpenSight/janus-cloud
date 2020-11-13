@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 * Added support for audio level feature for videoroom
 * Added support for h265, av1 codec support for videoroom
 * Support for require end-to-end encryption (require_e2ee) on videoroom
+* Added simulcast support for rtp_forward of videoroom
 
  [v0.3.0]  - 2020-06-21
 ---------------------------------
