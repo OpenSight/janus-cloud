@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 * Added support for h265, av1 codec support for videoroom
 * Support for require end-to-end encryption (require_e2ee) on videoroom
 * Added simulcast support for rtp_forward of videoroom
+* The APIs of Videoroom, Videocall, P2pcall is compatible with Janus-gateway of v0.10.7
 
  [v0.3.0]  - 2020-06-21
 ---------------------------------
