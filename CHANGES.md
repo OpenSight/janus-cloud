@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 * Support for require end-to-end encryption (require_e2ee) on videoroom
 * Added simulcast support for rtp_forward of videoroom
 * The APIs of Videoroom, Videocall, P2pcall is compatible with Janus-gateway of v0.10.7
+* The gevent is updated to 20.9.0, which support python 3.7 or higher
 
  [v0.3.0]  - 2020-06-21
 ---------------------------------

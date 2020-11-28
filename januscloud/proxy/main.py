@@ -15,6 +15,8 @@ def main():
     if config['general']['daemonize']:
         with DaemonContext(stdin=sys.stdin,
                            stdout=sys.stdout,
+                           # Change the current working directory to the root
+                           # so we won't prevent file systems from being unmounted.
                            # working_directory=os.getcwd(),
                            files_preserve=list(range(3, 100))):
             do_main(config)
@@ -33,6 +35,7 @@ def do_main(config):
     from januscloud.transport.ws import WSServer
     import importlib
     from januscloud.common.error import JanusCloudError, JANUS_ERROR_NOT_IMPLEMENTED
+    import gevent
 
     set_root_logger(**(config['log']))
 
@@ -138,9 +141,9 @@ def do_main(config):
             for server in server_list:
                 server.stop()
 
-        gevent.signal(signal.SIGTERM, stop_server)
-        gevent.signal(signal.SIGQUIT, stop_server)
-        gevent.signal(signal.SIGINT, stop_server)
+        gevent.signal_handler(signal.SIGTERM, stop_server)
+        gevent.signal_handler(signal.SIGQUIT, stop_server)
+        gevent.signal_handler(signal.SIGINT, stop_server)
 
         serve_forever(server_list)  # serve all server
 
