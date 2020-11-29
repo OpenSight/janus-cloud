@@ -98,9 +98,9 @@ def do_main(config):
             _terminated = True
             rest_server.stop()
 
-        gevent.signal(signal.SIGTERM, stop_sentinel)
-        gevent.signal(signal.SIGQUIT, stop_sentinel)
-        gevent.signal(signal.SIGINT, stop_sentinel)
+        gevent.signal_handler(signal.SIGTERM, stop_sentinel)
+        gevent.signal_handler(signal.SIGQUIT, stop_sentinel)
+        gevent.signal_handler(signal.SIGINT, stop_sentinel)
 
         rest_server.serve_forever()
 
