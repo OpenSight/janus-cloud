@@ -3,7 +3,7 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
- [v0.4.0]  - unreleased
+ [v0.4.0]  - 2020-11-29
 ---------------------------------
 * Added support for audio level feature for videoroom
 * Added support for h265, av1 codec support for videoroom
