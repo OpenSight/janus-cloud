@@ -26,6 +26,8 @@ log = logging.getLogger(__name__)
 PROC_STOP = 0
 PROC_RUNNING = 1
 
+PROC_STATUS_TEXT = ['STOP', 'RUNNING']
+
 POLL_INTERVAL_SEC = 0.1
 DEFAULT_STOP_WAIT_TIMEOUT = 3
 
@@ -37,6 +39,7 @@ else:
 
 _watchers = weakref.WeakValueDictionary()
 _next_wid = 0
+
 
 
 def _get_next_watcher_id():

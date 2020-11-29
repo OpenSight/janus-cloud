@@ -12,7 +12,7 @@ from januscloud.common.utils import random_uint64, create_janus_msg, get_host_ip
 from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
     JANUS_SERVER_STATUS_MAINTENANCE, JANUS_SERVER_STATUS_HWM
 from januscloud.proxy.core.backend_session import BackendTransaction
-from januscloud.sentinel.process_mngr import PROC_RUNNING
+from januscloud.sentinel.process_mngr import PROC_RUNNING, PROC_STATUS_TEXT
 from januscloud.transport.ws import WSClient
 
 log = logging.getLogger(__name__)
@@ -250,7 +250,8 @@ class JanusServer(object):
             self.query_stat()
 
     def on_process_status_change(self, watcher):
-        log.debug('on_process_status_change is called, new status: {}'.format(watcher.process_status))
+        log.debug('on_process_status_change is called, new status: {}({})'.format(
+            watcher.process_status, PROC_STATUS_TEXT[watcher.process_status]))
         if watcher.process_status == PROC_RUNNING:
             self.start_time = time.time()
         else:
