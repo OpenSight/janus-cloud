@@ -7,7 +7,7 @@ general:
   # configs_folder: "/etc/janus-cloud"    # Configuration files folder for plugins, default is the same
                                         # with the folder containing this config file
   server_name: ""                       # IP address or hostname of this Janus proxy,
-                                        # it will appear in an info request, and is used for addressing in proxies.
+                                        # it will appear in an info request, and is used for addressing among proxies.
                                         # Default is empty, means this Janus proxy has no hostname
   session_timeout: 60                   # How long (in seconds) we should wait before
                                         # deciding a Janus session has timed out. A

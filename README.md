@@ -198,8 +198,8 @@ janus-cloud/
     +----conf/            Sample configuration files
     |
     +----html/            Html & js page code for test client
-	|
-	+----doc/             some extra documents for janus-cloud
+    |
+    +----doc/             some extra documents for janus-cloud
     |
     +----januscloud/      Python code package of janus-cloud
     |

@@ -2118,7 +2118,7 @@ class VideoRoomHandle(FrontendHandleBase):
             for publisher in publisher_list:
                 publisher_rtp_forwarder_info = {
                     'publisher_id': publisher.user_id,
-                    'rtp_forwarder': publisher.rtp_forwarder_list(),
+                    'rtp_forwarders': publisher.rtp_forwarder_list(),
                 }
                 if publisher.display:
                     publisher_rtp_forwarder_info['display'] = publisher.display
@@ -2687,6 +2687,7 @@ def get_videoroom_room_list(request):
             'videocodec': ','.join(room.videocodec),
             'record': room.record,
             'record_dir': room.rec_dir,
+            'lock_record': room.lock_record,
             'num_participants': room.num_participants()
         }
         if room.bitrate_cap:
@@ -2743,6 +2744,7 @@ def get_videoroom_room(request):
         'videocodec': ','.join(room.videocodec),
         'record': room.record,
         'record_dir': room.rec_dir,
+        'lock_record': room.lock_record,
         'num_participants': room.num_participants()
     }
     if room.bitrate_cap:
@@ -2829,11 +2831,11 @@ def get_videoroom_participant_list(request):
         if publisher.webrtc_started and publisher.audiolevel_ext:
             part_info['talking'] = publisher.talking
 
-        server, room_id = publisher.get_backend_server()
+        server, backend_room_id = publisher.get_backend_server()
         if server:
             part_info['backend_server'] = '{} ({})'.format(server.name, server.url)
-        if room_id:
-            part_info['backend_room_id'] = room_id
+        if backend_room_id:
+            part_info['backend_room_id'] = backend_room_id
 
         part_info_list.append(part_info)
 
@@ -2866,7 +2868,7 @@ def get_videoroom_forwarder_list(request):
     for publisher in publisher_list:
         publisher_rtp_forwarder_info = {
             'publisher_id': publisher.user_id,
-            'rtp_forwarder': publisher.rtp_forwarder_list(),
+            'rtp_forwarders': publisher.rtp_forwarder_list(),
         }
         if publisher.display:
             publisher_rtp_forwarder_info['display'] = publisher.display
