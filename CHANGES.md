@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 
  [v0.5.0]  - unreleased
 ---------------------------------
-
+* Supports redis as the room db type for videoroom plugin
 
  [v0.4.0]  - 2020-11-29
 ---------------------------------

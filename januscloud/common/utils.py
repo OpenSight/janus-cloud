@@ -105,9 +105,13 @@ def to_redis_hash(o):
             if not k.startswith("_"):
                 if v is None:
                     v = ""
-                if v is False:
+                elif v is False:
                     v = ''
-                if v is True:
+                elif v is True:
                     v = '1'
+                elif isinstance(v, list):
+                    v = ','.join(v)
+                elif isinstance(v, set):
+                    v = ','.join(v)
                 obj_dict[k] = v
         return obj_dict

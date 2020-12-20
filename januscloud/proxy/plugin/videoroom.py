@@ -1577,24 +1577,27 @@ class VideoRoom(object):
 
 class VideoRoomManager(object):
 
-    def __init__(self, room_db='', auto_cleanup_sec=0, admin_key=''):
+    def __init__(self, room_db='', room_dao=None, auto_cleanup_sec=0, admin_key=''):
         self._rooms_map = {}
         self._public_rooms_list = []
-        self._auto_cleanup_sec = auto_cleanup_sec
         self._admin_key = admin_key
+        self._room_dao = room_dao
+        self._room_db = room_db
+        self._auto_cleanup_sec = auto_cleanup_sec
         if 0 < self._auto_cleanup_sec < 60:
             self._auto_cleanup_sec = 60    # above 60 secs
+        self._auto_cleanup_greenlet = None
+        if self._room_dao is not None:
+            self._load_from_dao()
         if auto_cleanup_sec:
             self._auto_cleanup_greenlet = gevent.spawn(self._room_auto_cleanup_routine)
-        else:
-            self._auto_cleanup_greenlet = None
 
     def __len__(self):
         return len(self._rooms_map)
 
     def create(self, room_id=0, permanent=False, admin_key='', room_params={}):
-        if permanent:
-            raise JanusCloudError('permanent not support by memory room manager',
+        if permanent and self._room_dao is None:
+            raise JanusCloudError('permanent not support',
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
         if self._admin_key:
             if admin_key == '':
@@ -1633,14 +1636,22 @@ class VideoRoomManager(object):
         if new_room.require_e2ee:
             log.debug('  -- All publishers MUST use end-to-end encryption')
 
-        return new_room
+        saved = False
+        if permanent and self._room_dao is not None:
+            try:
+                self._room_dao.add(new_room)
+                saved = True
+            except Exception as e:
+                log.warning('Fail to add room to DB: {}'.format(e))
+
+        return new_room, saved
 
     def update(self, room_id, secret='', permanent=False,
                new_description=None, new_secret=None, new_pin=None, new_is_private=None,
                new_require_pvtid=None, new_bitrate=None, new_publishers=None,
                new_lock_record=None):
-        if permanent:
-            raise JanusCloudError('permanent not support by memory room manager',
+        if permanent and self._room_dao is None:
+            raise JanusCloudError('permanent not support',
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
 
         room = self.get(room_id).check_modify(secret)
@@ -1666,7 +1677,15 @@ class VideoRoomManager(object):
 
         room.update()
 
-        return room
+        saved = False
+        if permanent and self._room_dao is not None:
+            try:
+                self._room_dao.update(room)
+                saved = True
+            except Exception as e:
+                log.warning('Fail to update room config to DB: {}'.format(e))
+
+        return room, saved
 
     def get(self, room_id):
         room = self._rooms_map.get(room_id)
@@ -1679,8 +1698,8 @@ class VideoRoomManager(object):
         return room_id in self._rooms_map
 
     def destroy(self, room_id, secret='', permanent=False):
-        if permanent:
-            raise JanusCloudError('permanent not support by memory room manager',
+        if permanent and self._room_dao is None:
+            raise JanusCloudError('permanent not support',
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
         room = self.get(room_id).check_modify(secret)
 
@@ -1689,6 +1708,16 @@ class VideoRoomManager(object):
         if room in self._public_rooms_list:
             self._public_rooms_list.remove(room)
         room.destroy()
+
+        saved = False
+        if permanent and self._room_dao is not None:
+            try:
+                self._room_dao.del_by_room_id(room_id)
+                saved = True
+            except Exception as e:
+                log.warning('Fail to delete room from DB: {}'.format(e))
+
+        return saved
 
     def list(self, admin_key='', offset=0, limit=100):
         room_list = self._public_rooms_list
@@ -1717,6 +1746,18 @@ class VideoRoomManager(object):
                         setattr(room, k, v)
                 room.update()
 
+    def _load_from_dao(self):
+        if self._room_dao is None:
+            return
+        room_list = self._room_dao.get_list()
+        for room in room_list:
+            self._rooms_map[room.room_id] = room
+            if not room.is_private:
+                self._public_rooms_list.append(room)
+        log.info('Video rooms are loaded from DB ({}) successfully, total {} rooms'.format(
+            self._room_db,
+            len(room_list)))
+
     def _room_auto_cleanup_routine(self):
         cleanup_rooms = []
         while True:
@@ -1737,7 +1778,14 @@ class VideoRoomManager(object):
                     try:
                         room.destroy()
                     except Exception as e:
-                        log.exception('Failed to cleanup the empty room "{}"'.format(room.room_id))
+                        log.warning('Failed to destroy the empty room "{}": {}'.format(room.room_id, e))
+
+                if self._room_dao is not None:
+                    try:
+                        self._room_dao.del_by_list(cleanup_rooms)
+                    except Exception as e:
+                        log.warning('Failed to delete the empty rooms from DB: {}'.format(e))
+
                 cleanup_rooms.clear()
                 delta_time = get_monotonic_time() - now
                 if delta_time < ROOM_CLEANUP_CHECK_INTERVAL:
@@ -1963,38 +2011,38 @@ class VideoRoomHandle(FrontendHandleBase):
             room_base_info = room_base_schema.validate(body)
             admin_key = body.get('admin_key', '')
             room_params = room_params_schema.validate(body)
-            new_room = self._room_mgr.create(room_id=room_base_info['room'],
-                                             permanent=room_base_info['permanent'],
-                                             admin_key=admin_key,
-                                             room_params=room_params)
+            new_room, saved = self._room_mgr.create(room_id=room_base_info['room'],
+                                                    permanent=room_base_info['permanent'],
+                                                    admin_key=admin_key,
+                                                    room_params=room_params)
             result = {
                 'videoroom': 'created',
                 'room': new_room.room_id,
-                'permanent': room_base_info['permanent']
+                'permanent': saved
             }
         elif request == 'edit':
             log.debug('Attempt to edit the properties of an existing videoroom room')
             room_base_info = room_base_schema.validate(body)
             room_new_params = room_edit_schema.validate(body)
-            self._room_mgr.update(room_id=room_base_info['room'],
-                                  secret=room_base_info['secret'],
-                                  permanent=room_base_info['permanent'],
-                                  **room_new_params)
+            room, saved = self._room_mgr.update(room_id=room_base_info['room'],
+                                                secret=room_base_info['secret'],
+                                                permanent=room_base_info['permanent'],
+                                                **room_new_params)
             result = {
                 'videoroom': 'edited',
                 'room': room_base_info['room'],
-                'permanent': room_base_info['permanent']
+                'permanent': saved
             }
         elif request == 'destroy':
             log.debug('Attempt to destroy an existing videoroom room')
             room_base_info = room_base_schema.validate(body)
-            self._room_mgr.destroy(room_id=room_base_info['room'],
-                                  secret=room_base_info['secret'],
-                                  permanent=room_base_info['permanent'])
+            saved = self._room_mgr.destroy(room_id=room_base_info['room'],
+                                           secret=room_base_info['secret'],
+                                           permanent=room_base_info['permanent'])
             result = {
                 'videoroom': 'destroyed',
                 'room': room_base_info['room'],
-                'permanent': room_base_info['permanent']
+                'permanent': saved
             }
         elif request == 'list':
             log.debug('Getting the list of video rooms')
@@ -2526,17 +2574,30 @@ class VideoRoomPlugin(PluginBase):
             os.path.join(proxy_config['general']['configs_folder'], 'janus-proxy.plugin.videoroom.yml')
         )
         self.backend_server_mgr = backend_server_mgr
-
+        room_dao = None
         if self.config['general']['room_db'].startswith('memory'):
-            self.room_mgr = VideoRoomManager(
-                room_db=self.config['general']['room_db'],
-                auto_cleanup_sec=self.config['general']['room_auto_destroy_timeout'],
-                admin_key=self.config['general']['admin_key']
-            )
+            room_dao = None
+        elif self.config['general']['room_db'].startswith('redis://'):
+            import redis
+            from januscloud.proxy.dao.rd_room_dao import RDRoomDao
+            connection_pool = redis.BlockingConnectionPool.from_url(
+                url=self.config['general']['room_db'],
+                decode_responses=True,
+                health_check_interval=30,
+                timeout=10)
+            redis_client = redis.Redis(connection_pool=connection_pool)
+            room_dao = RDRoomDao(redis_client)
         else:
             raise JanusCloudError(
-                'backend_engine {} not support by videoroom plugin'.format(self.config['general']['backend_engine']),
+                'room_db \'{}\' not support by videoroom plugin'.format(self.config['general']['room_db']),
                 JANUS_ERROR_NOT_IMPLEMENTED)
+
+        self.room_mgr = VideoRoomManager(
+            room_db=self.config['general']['room_db'],
+            room_dao=room_dao,
+            auto_cleanup_sec=self.config['general']['room_auto_destroy_timeout'],
+            admin_key=self.config['general']['admin_key']
+        )
 
         self.room_mgr.load_from_config(self.config['rooms'])
 
@@ -2712,14 +2773,14 @@ def post_videoroom_room_list(request):
     room_base_info = room_base_schema.validate(params)
     admin_key = params.get('admin_key', '')
     room_params = room_params_schema.validate(params)
-    new_room = room_mgr.create(room_id=room_base_info['room'],
+    new_room, saved = room_mgr.create(room_id=room_base_info['room'],
                                permanent=room_base_info['permanent'],
                                admin_key=admin_key,
                                room_params=room_params)
     reply = {
         'videoroom': 'created',
         'room': new_room.room_id,
-        'permanent': room_base_info['permanent']
+        'permanent': saved
     }
 
     return reply

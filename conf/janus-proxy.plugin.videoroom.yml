@@ -3,8 +3,12 @@
 # General configuration for janus-proxy videoroom plugin
 general:
 
-  room_db: "memory"                            # URL of the database to store the room info,
-                                               # only support "memory" type by now
+  room_db: "memory"                            # URL of the database to store the room configs,
+                                               # Now only support memory or redis type.
+                                               # the url for memory db is: "memory",
+                                               # the url for redis is according to
+                                               # <https://www.iana.org/assignments/uri-schemes/prov/redis>, for example:
+                                               #      "redis://user:secret@localhost:6379/0" schema. default is memory
   room_auto_destroy_timeout: 0                 # if not zero, the idle room would be destroyed automatically
                                                # after "room_auto_destroy_timeout" sec. default is 0, means disable
                                                # room auto-destroy function

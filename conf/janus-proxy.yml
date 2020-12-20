@@ -22,7 +22,7 @@ general:
                                         # Now only support memory or redis type.
                                         # the url for memory db is: "memory",
                                         # the url for redis is according to
-                                        # <https://www.iana.org/assignments/uri-schemes/prov/rediss>, for example:
+                                        # <https://www.iana.org/assignments/uri-schemes/prov/redis>, for example:
                                         #      "redis://user:secret@localhost:6379/0" schema. default is memory
   server_select: "rr"                   # select algorithm for backend Janus server, now support "rr" (round robin),
                                         # "rand" (random), "lb" (load balance), "wr"(weighted random) and the

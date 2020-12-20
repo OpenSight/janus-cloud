@@ -51,7 +51,7 @@ def do_main(config):
         from januscloud.proxy.dao.mem_server_dao import MemServerDao
         if config['general']['server_db'].startswith('memory'):
             server_dao = MemServerDao()
-        elif config['general']['server_db'].startswith('redis'):
+        elif config['general']['server_db'].startswith('redis://'):
             import redis
             from januscloud.proxy.dao.rd_server_dao import RDServerDao
             connection_pool = redis.BlockingConnectionPool.from_url(
