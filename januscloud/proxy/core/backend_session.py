@@ -167,6 +167,9 @@ class BackendSession(object):
             gevent.kill(self._auto_destroy_greenlet)
             self._auto_destroy_greenlet = None
 
+        if self._keepalive_greenlet is not None:
+            self._keepalive_greenlet = None
+
         for handle in self._handles.values():
             handle.on_close()
         self._handles.clear()

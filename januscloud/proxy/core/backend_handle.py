@@ -138,7 +138,6 @@ class BackendHandle(object):
             # drop the event
             log.error("backend handle {} async event queue is full, drop the receiving event".format(self.handle_id))
 
-
     def on_close(self):
         if self._has_detach:
             return
