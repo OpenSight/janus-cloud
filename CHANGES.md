@@ -6,7 +6,10 @@ All notable changes to this project will be documented in this file.
  [v0.5.0]  - unreleased
 ---------------------------------
 * Supports redis as the room db type for videoroom plugin
-* Add info / ping endpoints to proxy rest API
+* Add info/ping interface to proxy rest API
+* Support redis as the user db for videocall plugin
+* Support multi-proxy mode for videocall plugin
+* Add exists request for videocall plugin API
 
  [v0.4.0]  - 2020-11-29
 ---------------------------------

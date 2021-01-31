@@ -59,7 +59,12 @@ INCOMMING_CALL_TIMEOUT = 10
 username_schema = Schema({
     'username': StrRe('^\w{1,128}$'),
     DoNotCare(str): object  # for all other key we don't care
- })
+})
+
+exists_schema = Schema({
+    'username': StrRe('^\w{1,128}$'),
+    DoNotCare(str): object  # for all other key we don't care
+})
 
 set_schema = Schema({
     'request': StrVal(),
@@ -73,12 +78,11 @@ set_schema = Schema({
     Optional('temporal'): IntVal(min=0, max=2),
     Optional('fallback'): IntVal(min=0),
     DoNotCare(str): object  # for all other key we we don't care
- })
+})
 
 post_videocall_user_schema = Schema({
-    'caller_username': StrRe('^\w{1, 128}$'),
+    'caller_username': StrRe('^\w{1,128}$'),
     'backend_server_url': StrVal(max_len=1024),
-    'backend_keepalive_interval': IntVal(min=1, max=86400),
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -120,7 +124,8 @@ class VideoCallHandle(FrontendHandleBase):
             self._auto_disconnect_greenlet = None
 
         if self.videocall_user:
-            self._plugin.user_dao.del_by_username(self.videocall_user.username)
+            # print('user_dao remove')
+            self._plugin.user_dao.remove(self.videocall_user)
             self.videocall_user.handle = None
             self.videocall_user = None
 
@@ -170,9 +175,9 @@ class VideoCallHandle(FrontendHandleBase):
         self.videocall_user.incall = True
         self.videocall_user.peer_name = caller_username
         self.videocall_user.utime = time.time()
+        self._plugin.user_dao.update(self.videocall_user)
         try:
             self._connect_backend(backend_server_url)
-            self._plugin.user_dao.update(self.videocall_user)
         except Exception:
             self._disconnect_backend()
             self.videocall_user.peer_name = ''
@@ -190,7 +195,15 @@ class VideoCallHandle(FrontendHandleBase):
             request = body.get('request')
             if request is None:
                 raise JanusCloudError('Request {}  format invalid'.format(body), JANUS_VIDEOCALL_ERROR_INVALID_ELEMENT)
-            if request == 'list':
+            if request == 'exists':
+                body = exists_schema.validate(body)
+                username = body['username']
+                exists = self._plugin.user_dao.get_by_username(username) is not None
+                result = {
+                    'username': username,
+                    'registered': exists
+                }
+            elif request == 'list':
                 username_list = self._plugin.user_dao.get_username_list()
                 result = {
                     'list': username_list
@@ -201,11 +214,11 @@ class VideoCallHandle(FrontendHandleBase):
                                           JANUS_VIDEOCALL_ERROR_ALREADY_REGISTERED)
                 body = username_schema.validate(body)
                 username = body['username']
-                exist_user = self._plugin.user_dao.get_by_username(username)
-                if exist_user:
-                    log.error('Username \'{}\' already taken'.format(username))
-                    raise JanusCloudError('Username \'{}\' already taken'.format(username),
-                                          JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN)
+                # exist_user = self._plugin.user_dao.get_by_username(username)
+                # if exist_user:
+                #     log.error('Username \'{}\' already taken'.format(username))
+                #     raise JanusCloudError('Username \'{}\' already taken'.format(username),
+                #                           JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN)
                 # valid, register this new user
                 api_url = self._plugin.api_base_url + '/' + username
                 new_videocall_user = VideoCallUser(username, handle=self, api_url=api_url)
@@ -246,24 +259,26 @@ class VideoCallHandle(FrontendHandleBase):
                     }
                 else:
                     # start the calling process
-
+                    self.videocall_user.peer_name = username
+                    self.videocall_user.incall = True
+                    self.videocall_user.utime = time.time()
+                    self._plugin.user_dao.update(self.videocall_user)
                     try:
-                        self.videocall_user.peer_name = username
-                        self.videocall_user.incall = True
-                        self.videocall_user.utime = time.time()
                         self._connect_backend(server.url)
                         self._plugin.call_peer(username, self.videocall_user.username,
                                                server.url)
                         # send call request to backend server
                         result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
-                        self._plugin.user_dao.update(self.videocall_user)
                     except Exception:
                         backend_handle = self.backend_handle
                         self.backend_handle = None
-                        self.videocall_user.peer_name = ''
-                        self.videocall_user.incall = False
                         if backend_handle:
                             backend_handle.detach()
+
+                        self.videocall_user.peer_name = ''
+                        self.videocall_user.incall = False
+                        self.videocall_user.utime = time.time()
+                        self._plugin.user_dao.update(self.videocall_user)
                         raise
 
             elif request == 'accept':
@@ -302,7 +317,6 @@ class VideoCallHandle(FrontendHandleBase):
                     self.videocall_user.peer_name = ''
                     self.videocall_user.incall = False
                     self.videocall_user.utime = time.time()
-
                     self._plugin.user_dao.update(self.videocall_user)
 
                     if backend_handle:
@@ -525,16 +539,30 @@ class VideoCallPlugin(PluginBase):
         )
         self.backend_server_mgr = backend_server_mgr
 
+        self.api_base_url = self.get_api_base_url(proxy_config)
+        #print('api_base_url:', self.api_base_url)
+
         # set up DAO
-        from januscloud.proxy.dao.mem_videocall_user_dao import MemVideoCallUserDao
-        if self.config['general']['user_db'] == 'memory':
+        self.user_dao = None
+
+        if self.config['general']['user_db'].startswith('memory'):
+            from januscloud.proxy.dao.mem_videocall_user_dao import MemVideoCallUserDao
             self.user_dao = MemVideoCallUserDao()
+
+        elif self.config['general']['user_db'].startswith('redis://'):
+            import redis
+            from januscloud.proxy.dao.rd_videocall_user_dao import RDVideoCallUserDao
+            connection_pool = redis.BlockingConnectionPool.from_url(
+                url=self.config['general']['user_db'],
+                decode_responses=True,
+                health_check_interval=30,
+                timeout=10)
+            redis_client = redis.Redis(connection_pool=connection_pool)
+            self.user_dao = RDVideoCallUserDao(redis_client=redis_client,
+                                          api_base_url=self.api_base_url)
         else:
             raise JanusCloudError('user_db url {} not support by videocall plugin'.format(self.config['general']['user_db']),
                                   JANUS_ERROR_NOT_IMPLEMENTED)
-
-        self.api_base_url = self.get_api_base_url(proxy_config)
-        #print('api_base_url:', self.api_base_url)
 
         includeme(pyramid_config)
         pyramid_config.registry.videocall_plugin = self
@@ -562,7 +590,7 @@ class VideoCallPlugin(PluginBase):
     def create_handle(self, handle_id, session, opaque_id=None, *args, **kwargs):
         return VideoCallHandle(handle_id, session, self, opaque_id, *args, **kwargs)
 
-    def call_peer(self, peer_username, caller_username, backend_server_url, backend_keepalive_interval=10):
+    def call_peer(self, peer_username, caller_username, backend_server_url):
         peer = self.user_dao.get_by_username(peer_username)
         if peer is None:
             raise JanusCloudError('Username \'{}\' doesn\'t exist'.format(peer_username),
@@ -578,8 +606,9 @@ class VideoCallPlugin(PluginBase):
                                         JANUS_VIDEOCALL_ERROR_INVALID_REQUEST)
             r = requests.post(peer.api_url,
                               data={'caller_username': caller_username,
-                                    'backend_server_url': backend_server_url,
-                                    'backend_keepalive_interval':str(backend_keepalive_interval)})
+                                    'backend_server_url': backend_server_url
+                                    }
+                              )
             if r.status_code != requests.codes.ok:
                 try:
                     text = r.json()['info']
@@ -638,6 +667,8 @@ def includeme(config):
 
 @post_view(route_name='videocall_user')
 def post_video_user(request):
+    params = get_params_from_request(request)
+    print('params: {}'.format(params))
     params = get_params_from_request(request, post_videocall_user_schema)
     username = request.matchdict['username']
     #print('username:', username)
