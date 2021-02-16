@@ -33,7 +33,7 @@ def get_sentinel_info(request):
             'handle_num': janus_server.handle_num,
             'start_time': str(datetime.datetime.fromtimestamp(janus_server.start_time)),
 
-        },
+        }
     }
     if janus_watcher:
         info['janus_watcher'] = {
