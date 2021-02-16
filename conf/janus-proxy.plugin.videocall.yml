@@ -4,6 +4,10 @@
 general:
 
   user_db: "memory"                     # URL of the database to store the user info, 
-                                        # only support "memory" type by now
+                                        # Now only support memory or redis type.
+                                        # the url for memory db is: "memory",
+                                        # the url for redis is according to
+                                        # <https://www.iana.org/assignments/uri-schemes/prov/redis>, for example:
+                                        #      "redis://user:secret@localhost:6379/0" schema. default is memory
 
 
