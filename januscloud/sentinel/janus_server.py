@@ -93,6 +93,9 @@ class JanusServer(object):
         return 'ws://{}:{}'.format(self.server_public_ip, self.ws_port)
 
     def set_status(self, new_status):
+        if self._has_destroy:
+            return
+
         if self._in_maintenance:
             return  # ignore state change when maintaining
         old_status = self.status
@@ -105,6 +108,8 @@ class JanusServer(object):
                     listener.on_status_changed(new_status)
 
     def set_stat(self, session_num, handle_num):
+        if self._has_destroy:
+            return
         stat_updated = False
         if self.session_num != session_num:
             stat_updated = True
@@ -150,6 +155,8 @@ class JanusServer(object):
                 self.set_status(JANUS_SERVER_STATUS_NORMAL)
 
         except Exception as e:
+            if self._has_destroy:
+                return
             log.warning('Poll janus server({}) failed: {}'.format(self.url, e))
             self.set_status(JANUS_SERVER_STATUS_ABNORMAL)
             if self._ws_client:
@@ -177,7 +184,9 @@ class JanusServer(object):
                 handles.extend(response.get('handles', []))
             self.set_stat(session_num=len(sessions), handle_num=len(handles))
         except Exception as e:
-            log.warning('calculate stat of janus server({}) failed: {}'.format(self.admin_url, e))
+            if self._has_destroy:
+                return
+            log.warning('Calculate stat of janus server({}) failed: {}'.format(self.admin_url, e))
             self.set_stat(session_num=-1, handle_num=-1)   # stop post statistic
             if self._admin_ws_client:
                 try:

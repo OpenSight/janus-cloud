@@ -31,6 +31,9 @@ class BasicPoster(object):
     def on_stat_updated(self):
         pass
 
+    def post(self):
+        pass
+
 _poster_types = {}
 
 _posters = []

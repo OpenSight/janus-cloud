@@ -38,7 +38,7 @@ def do_main(config):
     from januscloud.common.logger import set_root_logger
     from januscloud.sentinel.process_mngr import ProcWatcher
     from januscloud.sentinel.janus_server import JanusServer
-    from januscloud.sentinel.poster_manager import add_poster
+    from januscloud.sentinel.poster_manager import add_poster, list_posters
     from januscloud.sentinel.poster.http_poster import HttpPoster
 
     set_root_logger(**(config['log']))
@@ -90,6 +90,7 @@ def do_main(config):
         if janus_watcher:
             janus_watcher.start()
 
+
         log.info('Janus Sentinel launched successfully')
 
         def stop_sentinel():
@@ -107,10 +108,18 @@ def do_main(config):
         # while not _terminated:
         #    gevent.sleep(1)
 
+        # destroy janus server
+        janus_server.destroy()
+
         # stop janus watcher
         if janus_watcher:
             janus_watcher.destroy()
             janus_watcher = None
+
+        # post to janux-proxy
+        posters = list_posters()
+        for poster in posters:
+            poster.post()
 
         log.info("Janus-sentinel Quit")
 
@@ -119,6 +128,9 @@ def do_main(config):
         if janus_watcher:
             janus_watcher.destroy()
             janus_watcher = None
+
+
+
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
  [v0.6.0]  - unreleased
 ---------------------------------
 
-
+* sentinel exit elegantly by post abnormal status to janus-proxy
 
  [v0.5.0]  - 2021-02-16
 ---------------------------------
