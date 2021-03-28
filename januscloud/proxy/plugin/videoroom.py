@@ -51,7 +51,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.10.7(2020-10-30)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.10.10(2021-03-19)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -141,6 +141,14 @@ kick_schema = Schema({
     'id': IntVal(min=1),
     AutoDel(str): object  # for all other key we must delete
 })
+
+moderate_schema = Schema({
+    Optional('mute_audio'): BoolVal(),
+    Optional('mute_video'): BoolVal(),
+    Optional('mute_data'): BoolVal(),
+    AutoDel(str): object  # for all other key we must delete
+})
+
 rtp_forward_schema = Schema({
     'host': StrVal(max_len=256),
     Optional('host_family'): EnumVal(['ipv4', 'ipv6']),
@@ -1100,6 +1108,27 @@ class VideoRoomPublisher(object):
         }
         _send_backend_message(self._backend_handle, body=body)
 
+    def moderate(self, mute_audio=None, mute_video=None, mute_data=None):
+        self._assert_valid()
+        if self._backend_handle is None:
+            raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
+                                  JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+
+        # send request to backend
+        body = {
+            'request': 'moderate',
+            'room': self._backend_room_id,
+            'id': self.user_id,
+        }
+        if mute_audio is not None:
+            body['mute_audio'] = bool(mute_audio)
+        if mute_video is not None:
+            body['mute_video'] = bool(mute_video)
+        if mute_data is not None:
+            body['mute_data'] = bool(mute_data)
+
+        _send_backend_message(self._backend_handle, body=body)
+
     def push_videoroom_event(self, data):
         if self._has_destroyed:
             return
@@ -1131,7 +1160,7 @@ class VideoRoomPublisher(object):
             if op == 'slow_link':
                 if self._frontend_handle:
                     self._frontend_handle.push_plugin_event(data, jsep)
-            if op == 'talking' or op =='stopped-talking':
+            elif op == 'talking' or op =='stopped-talking':
                 if op == 'talking':
                     self.talking = True
                 else:
@@ -1144,6 +1173,20 @@ class VideoRoomPublisher(object):
                         self._frontend_handle.push_plugin_event(talk_event)
                     if self.room:
                         self.room.notify_other_participants(self, talk_event)
+            elif op == 'event':
+                if ('audio-moderation' in data) \
+                  or ('video-moderation' in data) \
+                  or ('data-moderation' in data):
+                    moderation_event = data.copy()
+                    moderation_event['id'] = self.user_id
+                    moderation_event['room'] = self.room_id
+                    if self._frontend_handle:
+                        self._frontend_handle.push_plugin_event(moderation_event)
+                    if self.room:
+                        self.room.notify_other_participants(self, moderation_event)
+                else:
+                    # ignore other event
+                    return
             else:
                 # ignore other operations
                 return
@@ -1253,8 +1296,8 @@ class VideoRoom(object):
         self.bitrate_cap = bitrate_cap           # Whether the above limit is insormountable
         self.fir_freq = fir_freq                 # Regular FIR frequency (0=disabled)
 
-        self.audiocodec = audiocodec[:3]         # Audio codec(s) to force on publishers, max 3 codec
-        self.videocodec = videocodec[:3]         # Video codec(s) to force on publishers
+        self.audiocodec = audiocodec[:5]         # Audio codec(s) to force on publishers, max 5 codec
+        self.videocodec = videocodec[:5]         # Video codec(s) to force on publishers
         self.opus_fec = opus_fec                 # Whether inband FEC must be negotiated
                                                  # (note: only available for Opus)
         if self.opus_fec and 'opus' not in self.audiocodec:
@@ -1292,8 +1335,15 @@ class VideoRoom(object):
                                                  # participant joins the room
         self.lock_record = lock_record           # Whether recording state can only be changed providing the room secret
 
-        self.h264_profile = h264_profile         # H.264 codec profile to prefer, if more are negotiated
-        self.vp9_profile = vp9_profile           # VP9 codec profile to prefer, if more are negotiated
+        if 'h264' in self.videocodec:
+            self.h264_profile = h264_profile         # H.264 codec profile to prefer, if more are negotiated
+        else:
+            self.h264_profile = ''
+
+        if 'vp9' in self.videocodec:
+            self.vp9_profile = vp9_profile           # VP9 codec profile to prefer, if more are negotiated
+        else:
+            self.vp9_profile = ''
 
         self.require_e2ee = require_e2ee         # Whether end-to-end encrypted publishers are required
 
@@ -2134,6 +2184,24 @@ class VideoRoomHandle(FrontendHandleBase):
             result = {
                 'videoroom': 'success'
             }
+
+        elif request == 'moderate':
+            log.debug('Attempt to moderate a participant as a moderator in an existing VideoRoom room')
+            room_base_info = room_base_schema.validate(body)
+            moderate_params = moderate_schema.validate(body)
+            room = self._room_mgr.get(room_base_info['room']). \
+                check_modify(room_base_info['secret'])
+            publisher_id = body.get('id', 0)
+            publisher = room.get_participant_by_user_id(publisher_id)
+            if publisher is None:
+                raise JanusCloudError("No such user {} in room {}".format(publisher_id, room_base_info['room']),
+                                      JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+            publisher.moderate(**moderate_params)
+
+            result = {
+                'videoroom': 'success'
+            }
+
         elif request == 'listparticipants':
             room_base_info = room_base_schema.validate(body)
             room = self._room_mgr.get(room_base_info['room'])
@@ -2409,7 +2477,7 @@ class VideoRoomHandle(FrontendHandleBase):
                         raise JanusCloudError('Invalid element (ptype)',
                                               JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
                 else:
-                    raise JanusCloudError('Invalid request on unconfigured participant',
+                    raise JanusCloudError('Invalid request "{}" on unconfigured participant'.format(request),
                                           JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
             elif self.participant_type == JANUS_VIDEOROOM_P_TYPE_PUBLISHER:
                 publisher = self.participant
