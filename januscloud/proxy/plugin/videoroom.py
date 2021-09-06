@@ -1108,7 +1108,7 @@ class VideoRoomPublisher(object):
         body = {
             'request': 'enable_recording',
             'room': self._backend_room_id,
-            'enable_recording': record
+            'record': record
         }
         _send_backend_message(self._backend_handle, body=body)
 
@@ -2035,7 +2035,7 @@ class VideoRoomHandle(FrontendHandleBase):
             if request == 'create' or request == 'edit' or request == 'destroy' or request == 'list' \
                     or request == 'exists' or request == 'allowed' or request == 'kick' \
                     or request == 'listparticipants' or request == 'listforwarders' or request == 'rtp_forward' \
-                    or request == 'stop_rtp_forward':
+                    or request == 'stop_rtp_forward' or request == 'moderate' or request == 'enable_recording':
 
                 result = self._handle_sync_message(transaction, body, jsep)
 
