@@ -626,6 +626,10 @@ class VideoRoomPublisher(object):
         self.user_audio_level_average = 0  # Participant's audio_level_average overwriting global room setting
         self.pvt_id = 0     # This is sent to the publisher for mapping purposes, but shouldn't be shared with others
 
+        self.audio_muted = False
+        self.video_muted = False
+        self.data_muted = False
+
         self._rtp_forwarders = {}
 
         self._backend_admin_key = backend_admin_key
@@ -1177,6 +1181,27 @@ class VideoRoomPublisher(object):
                 if ('audio-moderation' in data) \
                   or ('video-moderation' in data) \
                   or ('data-moderation' in data):
+
+                    # update self property
+                    audio_moderation = data.get('audio-moderation')
+                    video_moderation = data.get('video-moderation')
+                    data_moderation = data.get('data-moderation')
+                    if audio_moderation:
+                        if audio_moderation == 'muted':
+                            self.audio_muted = True
+                        elif audio_moderation == 'unmuted':
+                            self.audio_muted = False
+                    if video_moderation:
+                        if video_moderation == 'muted':
+                            self.video_muted = True
+                        elif video_moderation == 'unmuted':
+                            self.video_muted = False
+                    if data_moderation:
+                        if data_moderation == 'muted':
+                            self.data_muted = True
+                        elif data_moderation == 'unmuted':
+                            self.data_muted = False
+
                     moderation_event = data.copy()
                     moderation_event['id'] = self.user_id
                     moderation_event['room'] = self.room_id
@@ -1209,6 +1234,12 @@ class VideoRoomPublisher(object):
                     publisher_info['simulcast'] = True
                 if self.audiolevel_ext:
                     publisher_info['talking'] = self.talking
+                if self.audio_muted:
+                    publisher_info['audio_moderated'] = True
+                if self.video_muted:
+                    publisher_info['video_moderated'] = True
+                if self.data_muted:
+                    publisher_info['data_moderated'] = True
                 pub_event = {
                     'videoroom': 'event',
                     'room': self.room_id,
@@ -2398,6 +2429,12 @@ class VideoRoomHandle(FrontendHandleBase):
                                         publisher_info['simulcast'] = True
                                     if publisher.audiolevel_ext:
                                         publisher_info['talking'] = publisher.talking
+                                    if publisher.audio_muted:
+                                        publisher_info['audio_moderated'] = True
+                                    if publisher.video_muted:
+                                        publisher_info['video_moderated'] = True
+                                    if publisher.data_muted:
+                                        publisher_info['data_moderated'] = True
                                     publishers.append(publisher_info)
 
                                 elif publisher != new_publisher and attendees is not None:
