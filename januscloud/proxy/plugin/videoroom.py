@@ -2144,7 +2144,7 @@ class VideoRoomHandle(FrontendHandleBase):
                     'audiocodec': ','.join(room.audiocodec),
                     'videocodec': ','.join(room.videocodec),
                     'record': room.record,
-                    'record_dir': room.rec_dir,
+                    'rec_dir': room.rec_dir,
                     'lock_record': room.lock_record,
                     'num_participants': room.num_participants(),
                     'audiolevel_ext': room.audiolevel_ext,
@@ -2153,6 +2153,7 @@ class VideoRoomHandle(FrontendHandleBase):
                     'playoutdelay_ext': room.playoutdelay_ext,
                     'transport_wide_cc_ext': room.transport_wide_cc_ext,
                     'require_e2ee': room.require_e2ee,
+                    'is_private': room.is_private,
                 }
                 if room.bitrate_cap:
                     room_info['bitrate_cap'] = True
