@@ -51,7 +51,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.10.10(2021-03-19)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.11.4(2021-09-7)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -2032,16 +2032,15 @@ class VideoRoomHandle(FrontendHandleBase):
             request = body.get('request')
             if request is None:
                 raise JanusCloudError('Request {}  format invalid'.format(body), JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
-            if request == 'create' or request == 'edit' or request == 'destroy' or request == 'list' \
-                    or request == 'exists' or request == 'allowed' or request == 'kick' \
-                    or request == 'listparticipants' or request == 'listforwarders' or request == 'rtp_forward' \
-                    or request == 'stop_rtp_forward' or request == 'moderate' or request == 'enable_recording':
+            if request in ('create', 'edit', 'destroy', 'list',  'exists', 'allowed', 'kick',
+                           'listparticipants', 'listforwarders', 'rtp_forward',
+                           'stop_rtp_forward', 'moderate', 'enable_recording'):
 
                 result = self._handle_sync_message(transaction, body, jsep)
 
-            elif request == 'join' or request == 'joinandconfigure' or request == 'configure' \
-                    or request == 'publish' or request == 'unpublish' or request == 'start' or request == 'pause' \
-                    or request == 'switch' or request == 'leave':
+            elif request in ('join', 'joinandconfigure', 'configure',
+                             'publish', 'unpublish', 'start', 'pause',
+                             'switch', 'leave'):
 
                 self._enqueue_async_message(transaction, body, jsep)
                 return JANUS_PLUGIN_OK_WAIT, None
