@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 ---------------------------------
 
 * sentinel exit elegantly by post abnormal status to janus-proxy
-* The APIs of Videoroom, Videocall, P2pcall is compatible with Janus-gateway of v0.10.10
+* The APIs of Videoroom, Videocall, P2pcall is compatible with Janus-gateway of v0.11.4
 
 
  [v0.5.0]  - 2021-02-16

@@ -38,7 +38,7 @@ JANUS_VIDEOCALL_ERROR_USE_ECHO_TEST = 479
 JANUS_VIDEOCALL_ERROR_NO_CALL = 481
 JANUS_VIDEOCALL_ERROR_MISSING_SDP = 482
 
-JANUS_VIDEOCALL_API_SYNC_VERSION = 'v0.10.10(2021-03-19))'
+JANUS_VIDEOCALL_API_SYNC_VERSION = 'v0.11.4(2021-09-7)'
 
 JANUS_VIDEOCALL_VERSION = 6
 JANUS_VIDEOCALL_VERSION_STRING = '0.0.6'
@@ -289,7 +289,7 @@ class VideoCallHandle(FrontendHandleBase):
                     raise JanusCloudError('Missing SDP', JANUS_VIDEOCALL_ERROR_MISSING_SDP)
 
                 # send accept request to backend server
-                result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
+                result, reply_jsep = self._send_backend_meseage(self.backend_handle, body, jsep)
             elif request == 'set':
                 if self.backend_handle:  # has set up the backend handle
                     # send set request to backend server
