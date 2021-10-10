@@ -35,7 +35,8 @@ class RDRoomDao(object):
         room_key_list = []
         for room in room_list:
             room_key_list.append(self._key_room(room.room_id))
-        self._redis_client.delete(*room_key_list)
+        if room_key_list:
+            self._redis_client.delete(*room_key_list)
 
     def add(self, room):
         room_key = self._key_room(room.room_id)
@@ -157,6 +158,16 @@ def test_redis():
 
     room_dao.del_by_room_id(room_id)
     assert room_dao.get_by_room_id(room_id) is None
+
+    rooms = []
+    rooms.append(VideoRoom(room_id=111, description='list_111'))
+    room_dao.add(rooms[0])
+    rooms.append(VideoRoom(room_id=222, description='list_222'))
+    room_dao.add(rooms[1])
+    room_dao.del_by_list(rooms)
+    assert room_dao.get_by_room_id(111) is None
+
+
 
     print('redis db test successful')
 

@@ -1423,7 +1423,9 @@ class VideoRoom(object):
         self._private_id.clear()
 
         # Notify all participants that the fun is over, and that they'll be kicked
-        log.debug("Notifying all participants")
+        log.debug("Room {} is destroyed, Notifying all participants".format(
+            self.room_id)
+        )
         destroyed_event = {
             'videoroom': 'destroyed',
             'room': self.room_id,
