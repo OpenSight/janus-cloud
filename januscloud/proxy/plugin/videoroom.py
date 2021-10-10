@@ -1418,7 +1418,8 @@ class VideoRoom(object):
             return
         self._has_destroyed = True
 
-        participants = self._participants.values()
+        participants = list(self._participants.values())
+
         self._participants.clear()
         self._private_id.clear()
 
@@ -1430,7 +1431,9 @@ class VideoRoom(object):
             'videoroom': 'destroyed',
             'room': self.room_id,
         }
+        # log.debug("after clear, len of participants is {}".format(len(participants)))
         for publisher in participants:
+            # log.debug('destroy publisher user_id {}'.format(publisher.user_id))
             publisher.push_videoroom_event(destroyed_event)
             publisher.room = None    # already removed from room, no need to call back room's on_participant destroy()
             publisher.room_id = 0
@@ -1525,7 +1528,7 @@ class VideoRoom(object):
         return user_id in self._participants
 
     def list_participants(self):
-        return self._participants.values()
+        return list(self._participants.values())
 
     def num_participants(self):
         return len(self._participants)
