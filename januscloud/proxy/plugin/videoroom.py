@@ -2268,12 +2268,18 @@ class VideoRoomHandle(FrontendHandleBase):
             publisher_list = room.list_participants()
             publisher_rtp_forwarders = []
             for publisher in publisher_list:
+                rtp_forwarder_list = publisher.rtp_forwarder_list()
+
+                if len(rtp_forwarder_list) == 0:
+                    continue
+
                 publisher_rtp_forwarder_info = {
                     'publisher_id': publisher.user_id,
-                    'rtp_forwarders': publisher.rtp_forwarder_list(),
+                    'rtp_forwarders': rtp_forwarder_list,
                 }
                 if publisher.display:
                     publisher_rtp_forwarder_info['display'] = publisher.display
+
                 publisher_rtp_forwarders.append(publisher_rtp_forwarder_info)
 
             result = {
@@ -3037,10 +3043,17 @@ def get_videoroom_forwarder_list(request):
     publisher_list = room.list_participants()
     publisher_rtp_forwarders = []
     for publisher in publisher_list:
+
+        rtp_forwarder_list = publisher.rtp_forwarder_list()
+
+        if len(rtp_forwarder_list) == 0:
+            continue
+
         publisher_rtp_forwarder_info = {
             'publisher_id': publisher.user_id,
-            'rtp_forwarders': publisher.rtp_forwarder_list(),
+            'rtp_forwarders': rtp_forwarder_list,
         }
+
         if publisher.display:
             publisher_rtp_forwarder_info['display'] = publisher.display
         publisher_rtp_forwarders.append(publisher_rtp_forwarder_info)
@@ -3066,7 +3079,7 @@ def post_videoroom_forwarder_list(request):
 
     room_base_info = room_base_schema.validate(params)
     room = room_mgr.get(room_id).check_modify(room_base_info['secret'])
-    publisher_id = params.get('publisher_id', 0)
+    publisher_id = int(params.get('publisher_id', 0))
     publisher = room.get_participant_by_user_id(publisher_id)
     if publisher is None:
         raise JanusCloudError("No such feed ({})".format(publisher_id),
