@@ -3,7 +3,7 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
- [v0.7.0]  - unreleased
+ [v0.7.0]  - 2021-04-03
 ---------------------------------
 
 * Initial support of DTX for VideoRoom
