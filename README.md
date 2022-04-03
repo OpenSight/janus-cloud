@@ -64,13 +64,13 @@ This is a simple video call plugin which allow two WebRTC peer communicate with 
 
 Moreover, Janus-proxy also can be scaled out for videocall plugin to handle much more video calls. Different WebRTC peers may be assigned to different Janus-proxies which is able to communicates with each other through admin interface.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v0.11.4(2021-09-7).
+Its APIs is compatible with the videocall plugin of Janus-gateway util v0.12.0(2022-03-03).
 
 ### p2pcall
 
 This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janus-proxy be able to scaled out to handle more video call. However no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v0.11.4(2021-09-7).
+Its APIs is compatible with the videocall plugin of Janus-gateway util v0.12.0(2022-03-03).
 
 ### videoroom
 
@@ -80,7 +80,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - subscriber switch not support
 - string_ids not support
 
-Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.11.4(2021-09-7).
+Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.12.0(2022-03-03).
 
 5 Topology
 -----------------

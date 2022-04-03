@@ -51,7 +51,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.11.4(2021-09-7)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.12.0(2022-03-03)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -94,6 +94,7 @@ room_params_schema = Schema({
     Optional('vp9_profile'): StrVal(max_len=256),
     Optional('h264_profile'): StrVal(max_len=256),
     Optional('opus_fec'): BoolVal(),
+    Optional('opus_dtx'): BoolVal(),   
     Optional('video_svc'): BoolVal(),
     Optional('audiolevel_ext'): BoolVal(),
     Optional('audiolevel_event'): BoolVal(),
@@ -121,6 +122,7 @@ room_edit_schema = Schema({
     Optional('new_bitrate'): IntVal(min=0),
     Optional('new_fir_freq'): IntVal(min=0),
     Optional('new_lock_record'): BoolVal(),
+    Optional('new_rec_dir'): StrVal(max_len=1024),
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -211,6 +213,9 @@ publisher_configure_schema = Schema({
     Optional('update'): BoolVal(),
     Optional('audio_active_packets'): IntVal(min=1),
     Optional('audio_level_average'): IntVal(min=1, max=127),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(), 
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -227,6 +232,9 @@ publisher_publish_schema = Schema({
     Optional('display'): StrVal(max_len=256),
     Optional('audio_active_packets'): IntVal(min=1),
     Optional('audio_level_average'): IntVal(min=1, max=127),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(), 
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -245,6 +253,9 @@ subscriber_join_schema = Schema({
     Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(), 
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -259,6 +270,9 @@ subscriber_configure_schema = Schema({
     Optional('fallback'): IntVal(min=0),
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(), 
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -357,6 +371,7 @@ class VideoRoomSubscriber(object):
                   substream=-1, temporal=-1,
                   fallback=-1,
                   spatial_layer=-1, temporal_layer=-1,
+                  min_delay=-1, max_delay=-1,
                   **kwargs):
         self._assert_valid()
         if self._backend_handle is not None:
@@ -416,6 +431,11 @@ class VideoRoomSubscriber(object):
                 body['spatial_layer'] = spatial_layer
             if temporal_layer >= 0:
                 body['temporal_layer'] = temporal_layer
+            if min_delay >= 0:
+                body['min_delay'] = min_delay
+            if max_delay >= 0:
+                body['max_delay'] = max_delay    
+
             if len(kwargs) > 0:
                 for k, v in kwargs.items():
                     if k not in body:
@@ -441,6 +461,7 @@ class VideoRoomSubscriber(object):
                   substream=-1, temporal=-1,
                   fallback=-1,
                   spatial_layer=-1, temporal_layer=-1,
+                  min_delay=-1, max_delay=-1,
                   **kwargs):
         self._assert_valid()
         if self._kicked:
@@ -474,6 +495,13 @@ class VideoRoomSubscriber(object):
             body['spatial_layer'] = spatial_layer
         if temporal_layer >= 0:
             body['temporal_layer'] = temporal_layer
+
+        if min_delay >= 0:
+            body['min_delay'] = min_delay
+        if max_delay >= 0:
+            body['max_delay'] = max_delay     
+
+
         if len(kwargs) > 0:
             for k, v in kwargs.items():
                 if k not in body:
@@ -746,6 +774,7 @@ class VideoRoomPublisher(object):
                 'audiocodec': ','.join(self.room.audiocodec),
                 'videocodec': ','.join(self.room.videocodec),
                 'opus_fec': self.room.opus_fec,
+                'opus_dtx': self.room.opus_dtx,                
                 'video_svc': self.room.video_svc,
                 'audiolevel_ext': self.room.audiolevel_ext,
                 'audiolevel_event': self.room.audiolevel_event,
@@ -821,6 +850,7 @@ class VideoRoomPublisher(object):
                 display='',
                 secret='',
                 audio_active_packets=0, audio_level_average=0,
+                min_delay=-1, max_delay=-1,
                 jsep=None,
                 **kwargs):
         self._assert_valid()
@@ -835,6 +865,7 @@ class VideoRoomPublisher(object):
                               display=display,
                               secret=secret,
                               audio_active_packets=audio_active_packets, audio_level_average=audio_level_average,
+                              min_delay=min_delay, max_delay=max_delay,
                               jsep=jsep,
                               **kwargs)
 
@@ -844,6 +875,7 @@ class VideoRoomPublisher(object):
                   record=None, filename='',
                   secret='',
                   audio_active_packets=0, audio_level_average=0,
+                  min_delay=-1, max_delay=-1,
                   display='', update=False,
                   jsep=None,
                   **kwargs):
@@ -906,6 +938,12 @@ class VideoRoomPublisher(object):
             body['audio_active_packets'] = audio_active_packets
         if audio_level_average:
             body['audio_level_average'] = audio_level_average
+        if min_delay >= 0:
+            body['min_delay'] = min_delay
+        if max_delay >= 0:
+            body['max_delay'] = max_delay
+
+        # other future parameters
         if len(kwargs) > 0:
             for k, v in kwargs.items():
                 if k not in body:
@@ -1083,6 +1121,9 @@ class VideoRoomPublisher(object):
 
     def del_subscriber(self, subscriber):
         self._subscribers.discard(subscriber)
+    
+    def subscriber_num(self):
+        return len(self._subscribers)
 
     def add_subscription(self, subscriber):
         self._subscriptions.add(subscriber)
@@ -1109,6 +1150,24 @@ class VideoRoomPublisher(object):
             'request': 'enable_recording',
             'room': self._backend_room_id,
             'record': record
+        }
+        _send_backend_message(self._backend_handle, body=body)
+
+
+    def new_rec_dir(self, new_rec_dir):
+        self._assert_valid()
+        if self._backend_handle is None:
+            raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
+                                  JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+
+        log.debug('edit rec_dir: {} for user {} ({}) of room {}'.
+                  format(new_rec_dir, self.user_id, self.display, self.room_id))
+
+        # send request to backend
+        body = {
+            'request': 'edit',
+            'room': self._backend_room_id,
+            'new_rec_dir': new_rec_dir
         }
         _send_backend_message(self._backend_handle, body=body)
 
@@ -1304,6 +1363,7 @@ class VideoRoom(object):
     def __init__(self, room_id, description='', secret='', pin='',
                  is_private=False, require_pvtid=False, publishers=3, bitrate=0,
                  bitrate_cap=False, fir_freq=0, audiocodec=['opus'], videocodec=['vp8'], opus_fec=False,
+                 opus_dtx=False,
                  video_svc=False, audiolevel_ext=True, audiolevel_event=False, audio_active_packets=100,
                  audio_level_average=25, videoorient_ext=True, playoutdelay_ext=True,
                  transport_wide_cc_ext=False, record=False, rec_dir='', allowed=None,
@@ -1331,10 +1391,17 @@ class VideoRoom(object):
         self.videocodec = videocodec[:5]         # Video codec(s) to force on publishers
         self.opus_fec = opus_fec                 # Whether inband FEC must be negotiated
                                                  # (note: only available for Opus)
+        self.opus_dtx = opus_dtx                 # Whether DTX must be negotiated 
+                                                 # (note: only available for Opus)                                                 
+                                                 
         if self.opus_fec and 'opus' not in self.audiocodec:
             self.opus_fec = False
             log.warning('Inband FEC is only supported for rooms that allow Opus: disabling it...')
         
+        if self.opus_dtx and 'opus' not in self.audiocodec:
+            self.opus_dtx = False
+            log.warning('DTX is only supported for rooms that allow Opus: disabling it...')
+
         self.video_svc = False
         if video_svc:                         # Whether SVC must be done for video
             if self.videocodec == ['vp9']:
@@ -1441,6 +1508,50 @@ class VideoRoom(object):
 
     def update(self):
         self.utime = time.time()
+
+
+    def edit(self, new_description=None, new_secret=None, new_pin=None, new_is_private=None,
+               new_require_pvtid=None, new_bitrate=None, new_publishers=None,
+               new_lock_record=None, new_rec_dir=None):
+
+
+        need_sync = False
+        if new_description is not None and len(new_description) > 0:
+            self.description = new_description
+        if new_secret is not None:
+            self.secret = new_secret
+        if new_pin is not None:
+            self.pin = new_pin
+        if new_is_private is not None:
+            self.is_private = new_is_private
+        if new_require_pvtid is not None:
+            self.require_pvtid = new_require_pvtid
+        if new_bitrate is not None:
+            self.bitrate = new_bitrate
+            if 0 < self.bitrate < 64000:
+                self.bitrate = 64000    # Don't go below 64k
+        if new_publishers is not None:
+            self.publishers = new_publishers
+        if new_lock_record is not None:
+            self.lock_record = new_lock_record
+        if new_rec_dir is not None:
+            self.rec_dir = new_rec_dir
+            need_sync =True
+
+        self.update()
+
+        if need_sync:
+            participant_list = list(self._participants.values())
+            for publisher in participant_list:
+                try:
+                    publisher.new_rec_dir(new_rec_dir)
+                except Exception as e:
+                    log.warning('Exception when change recording dir for publisher {} ({}) of room {} : {}, ignore it'.format(
+                        publisher.user_id, publisher.display, self.room_id, e))
+                    pass     # ignore errors during enable recording for each participant
+
+        
+        
 
     def new_participant(self, user_id, handle, display='', backend_admin_key=''):
         if handle is None:
@@ -1735,33 +1846,16 @@ class VideoRoomManager(object):
     def update(self, room_id, secret='', permanent=False,
                new_description=None, new_secret=None, new_pin=None, new_is_private=None,
                new_require_pvtid=None, new_bitrate=None, new_publishers=None,
-               new_lock_record=None):
+               new_lock_record=None, new_rec_dir=None):
         if permanent and self._room_dao is None:
             raise JanusCloudError('permanent not support',
                                   JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
 
         room = self.get(room_id).check_modify(secret)
 
-        if new_description is not None and len(new_description) > 0:
-            room.description = new_description
-        if new_secret is not None:
-            room.secret = new_secret
-        if new_pin is not None:
-            room.pin = new_pin
-        if new_is_private is not None:
-            room.is_private = new_is_private
-        if new_require_pvtid is not None:
-            room.require_pvtid = new_require_pvtid
-        if new_bitrate is not None:
-            room.bitrate = new_bitrate
-            if 0 < room.bitrate < 64000:
-                room.bitrate = 64000    # Don't go below 64k
-        if new_publishers is not None:
-            room.publishers = new_publishers
-        if new_lock_record is not None:
-            room.lock_record = new_lock_record
-
-        room.update()
+        room.edit(new_description=new_description, new_secret=new_secret, new_pin=new_pin, new_is_private=new_is_private,
+               new_require_pvtid=new_require_pvtid, new_bitrate=new_bitrate, new_publishers=new_publishers,
+               new_lock_record=new_lock_record, new_rec_dir=new_rec_dir)
 
         saved = False
         if permanent and self._room_dao is not None:
@@ -2163,6 +2257,8 @@ class VideoRoomHandle(FrontendHandleBase):
                     room_info['bitrate_cap'] = True
                 if room.opus_fec:
                     room_info['opus_fec'] = True
+                if room.opus_dtx:
+                    room_info['opus_dtx'] = True
                 if room.video_svc:
                     room_info['video_svc'] = True
                 if room.audiolevel_event:
@@ -2253,6 +2349,9 @@ class VideoRoomHandle(FrontendHandleBase):
 
                 if publisher.webrtc_started and publisher.audiolevel_ext:
                     part_info['talking'] = publisher.talking
+
+                if publisher.webrtc_started:
+                    part_info['subscribers'] = publisher.subscriber_num()
 
                 part_info_list.append(part_info)
 
@@ -2782,6 +2881,7 @@ class VideoRoomPlugin(PluginBase):
                 Optional('vp9_profile'): StrVal(max_len=256),
                 Optional('h264_profile'): StrVal(max_len=256),
                 Optional('opus_fec'): BoolVal(),
+                Optional('opus_dtx'): BoolVal(),
                 Optional('video_svc'): BoolVal(),
                 Optional('audiolevel_ext'): BoolVal(),
                 Optional('audiolevel_event'): BoolVal(),
@@ -2871,6 +2971,8 @@ def get_videoroom_room_list(request):
             room_info['bitrate_cap'] = True
         if room.opus_fec:
             room_info['opus_fec'] = True
+        if room.opus_dtx:
+            room_info['opus_dtx'] = True            
         if room.video_svc:
             room_info['video_svc'] = True
 
@@ -2928,6 +3030,8 @@ def get_videoroom_room(request):
         room_info['bitrate_cap'] = True
     if room.opus_fec:
         room_info['opus_fec'] = True
+    if room.opus_dtx:
+        room_info['opus_dtx'] = True        
     if room.video_svc:
         room_info['video_svc'] = True
 
@@ -3007,6 +3111,9 @@ def get_videoroom_participant_list(request):
 
         if publisher.webrtc_started and publisher.audiolevel_ext:
             part_info['talking'] = publisher.talking
+
+        if publisher.webrtc_started:
+            part_info['subscribers'] = publisher.subscriber_num()
 
         server, backend_room_id = publisher.get_backend_server()
         if server:

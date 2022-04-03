@@ -3,6 +3,16 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
+ [v0.7.0]  - unreleased
+---------------------------------
+
+* Initial support of DTX for VideoRoom
+* Make record directory changeable via edit in AudioBridge and VideoRoom
+* Added number of subscribers in response to listpartipants
+* Add support for playout-delay RTP extension
+* The APIs of Videoroom, Videocall, P2pcall is compatible with Janus-gateway of v0.12.0
+
+
 
  [v0.6.0]  - 2021-09-12
 ---------------------------------
