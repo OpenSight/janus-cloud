@@ -1,6 +1,5 @@
 import os
 from setuptools import setup, find_packages
-import januscloud
 
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
@@ -17,7 +16,7 @@ requires = [
 ]
 
 setup(name='janus-cloud',
-      version=januscloud.__version__,
+      version='0.7.0',
       license='AGPLv3',
       url='https://github.com/OpenSight/janus-cloud',
       description='Janus-cloud is a cluster solution for Janus WebRTC server, by API proxy approach',
