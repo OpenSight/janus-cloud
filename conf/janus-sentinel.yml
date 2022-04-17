@@ -10,10 +10,15 @@ janus:
 
   #server_name: ""                      # the name of the monitored janus-server. By default, sentinel would
                                         # choose a uuid.
-  server_ip: "127.0.0.1"                # the ip address of the monitored janus-server, default is 127.0.0.1.
-                                        # if server_addr is 127.0.0.1, Sentinel would probe the real ip of the local host,
-                                        # and report the real ip to outside system. Otherwise, Sentinel would report this
-                                        # value to outside
+  server_ip: "127.0.0.1"                # the local ip address of the janus-server for Sentinel monitor, 
+                                        # default is "127.0.0.1".
+
+  public_ip: ""                         # the ip address of the janus-server for the public access, Sentinel would
+                                        # report this public ip to ouside system. default is empty.
+                                        # If it's empty, Sentinel would probe the ip of the local host. 
+                                        # For some IaaS (like aliyun, aws), the host would binds a public ip different from 
+                                        # the local ip of the host's NIC
+
   ws_port: 8188                         # the business API WebSocket port of the monitored janus-server, default is 8188
 
   admin_ws_port: 0                      # the admin API WebSocket port of the monitored janus-server, default is 0.
@@ -34,6 +39,12 @@ janus:
                                         # not enable hwm check
   admin_secret: ""                      # if non-empty, Sentinel includes this admin_secret for all admin API request.
                                         # Default is empty
+
+  location: ""                          # Location id for this janus-server, default is empty, means unknown. 
+                                        # It's used for orchestration
+
+  isp: ""                               # ISP (Internet Service Provider) id for this janus-server,  default is empty, 
+                                        # means all ISP available. It's used for orchestration
 
 proc_watcher:
   cmdline: ""                           # command line to start up janus-server. default is empty, means not enable

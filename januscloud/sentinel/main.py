@@ -52,13 +52,16 @@ def do_main(config):
         janus_server = JanusServer(
             server_name=config['janus']['server_name'],
             server_ip=config['janus']['server_ip'],
+            public_ip=config['janus']['public_ip'],
             ws_port=config['janus']['ws_port'],
             admin_ws_port=config['janus']['admin_ws_port'],
             pingpong_interval=config['janus']['pingpong_interval'],
             statistic_interval=config['janus']['statistic_interval'],
             request_timeout=config['janus']['request_timeout'],
             hwm_threshold=config['janus']['hwm_threshold'],
-            admin_secret=config['janus']['admin_secret']
+            admin_secret=config['janus']['admin_secret'],
+            location=config['janus']['location'],
+            isp=config['janus']['isp'],
         )
 
         # set up janus_watcher

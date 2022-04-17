@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
+from januscloud.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
     JANUS_SERVER_STATUS_MAINTENANCE
 from januscloud.proxy.rest.common import get_view, post_view, delete_view, get_params_from_request
 from januscloud.common.schema import Schema, Optional, DoNotCare, \

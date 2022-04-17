@@ -24,6 +24,7 @@ config_schema = Schema({
     Optional("janus"): Default({
         Optional("server_name"): Default(StrVal(min_len=0, max_len=64), default=''),
         Optional("server_ip"): Default(StrVal(), default='127.0.0.1'),
+        Optional("public_ip"): Default(StrVal(), default=''),
         Optional("ws_port"): Default(IntVal(min=0, max=65536), default=8188),
         Optional("admin_ws_port"): Default(IntVal(min=0, max=65536), default=0),
         Optional("pingpong_interval"): Default(IntVal(min=1, max=3600), default=5),
@@ -31,6 +32,8 @@ config_schema = Schema({
         Optional("request_timeout"): Default(IntVal(min=1, max=3600), default=10),
         Optional("hwm_threshold"): Default(IntVal(min=0, max=300), default=0),
         Optional('admin_secret'): Default(StrVal(), default=''),
+        Optional("location"): Default(StrVal(min_len=0, max_len=64), default=''),
+        Optional("isp"): Default(StrVal(min_len=0, max_len=64), default=''),
         AutoDel(str): object  # for all other key remove
     }, default={}),
 

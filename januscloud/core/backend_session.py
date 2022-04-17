@@ -12,7 +12,7 @@ import time
 import gevent
 from gevent.event import Event
 from januscloud.transport.ws import WSClient
-from januscloud.proxy.core.backend_handle import BackendHandle
+from januscloud.core.backend_handle import BackendHandle
 
 log = logging.getLogger(__name__)
 

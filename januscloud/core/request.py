@@ -8,8 +8,8 @@ from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, StrVal, \
     FloatVal, AutoDel
-from januscloud.proxy.core.frontend_handle_base import JANUS_PLUGIN_OK, JANUS_PLUGIN_OK_WAIT
-from januscloud.proxy.core.plugin_base import get_plugin_list
+from januscloud.core.frontend_handle_base import JANUS_PLUGIN_OK, JANUS_PLUGIN_OK_WAIT
+from januscloud.core.plugin_base import get_plugin_list
 
 log = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ import time
 import logging
 from januscloud.transport.ws import WSServer, WSClient
 from januscloud.common.logger import test_config
-from januscloud.proxy.core.request import RequestHandler
+from januscloud.core.request import RequestHandler
 
 log = logging.getLogger(__name__)
 

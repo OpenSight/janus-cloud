@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
+from januscloud.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
     JANUS_SERVER_STATUS_MAINTENANCE
 from januscloud.proxy.rest.common import get_view, post_view, delete_view, get_params_from_request
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
     FloatVal, AutoDel, StrVal, EnumVal
 from pyramid.response import Response
-from januscloud.proxy.core.plugin_base import get_plugin_list
+from januscloud.core.plugin_base import get_plugin_list
 
 def includeme(config):
     config.add_route('info', '/info')

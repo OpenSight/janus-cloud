@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from januscloud.common.utils import to_redis_hash
-from januscloud.proxy.core.backend_server import BackendServer
+from januscloud.core.backend_server import BackendServer
 from redis import RedisError
 log = logging.getLogger(__name__)
 

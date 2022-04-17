@@ -49,6 +49,8 @@ class HttpPoster(BasicPoster):
             'status': self._janus_server.status,
             'start_time': self._janus_server.start_time,
             'expire': self.expire,
+            'isp': self._janus_server.isp,
+            'location': self._janus_server.location
         }
 
         if self._janus_server.session_num >= 0:

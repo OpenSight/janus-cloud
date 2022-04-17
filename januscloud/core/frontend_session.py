@@ -11,7 +11,7 @@ import time
 import gevent
 import sys
 
-from januscloud.proxy.core.plugin_base import get_plugin
+from januscloud.core.plugin_base import get_plugin
 
 log = logging.getLogger(__name__)
 

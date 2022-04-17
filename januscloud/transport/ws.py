@@ -10,7 +10,7 @@ from ws4py.client.geventclient import WebSocketClient
 from gevent import Greenlet
 from gevent.lock import RLock
 from gevent.pool import Pool
-from januscloud.proxy.core.request import Request
+from januscloud.core.request import Request
 from januscloud.common.utils import get_monotonic_time
 
 log = logging.getLogger(__name__)

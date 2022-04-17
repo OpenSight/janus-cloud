@@ -8,9 +8,9 @@ from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
     FloatVal, AutoDel
-from januscloud.proxy.core.backend_session import get_backend_session
-from januscloud.proxy.core.plugin_base import PluginBase
-from januscloud.proxy.core.frontend_handle_base import FrontendHandleBase, JANUS_PLUGIN_OK_WAIT
+from januscloud.core.backend_session import get_backend_session
+from januscloud.core.plugin_base import PluginBase
+from januscloud.core.frontend_handle_base import FrontendHandleBase, JANUS_PLUGIN_OK_WAIT
 
 
 log = logging.getLogger(__name__)

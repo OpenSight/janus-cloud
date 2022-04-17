@@ -2,7 +2,7 @@
 import datetime
 
 from januscloud.common.error import JANUS_ERROR_NOT_IMPLEMENTED, JanusCloudError
-from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL
+from januscloud.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL
 from januscloud.proxy.rest.common import get_view, post_view, delete_view, get_params_from_request
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \

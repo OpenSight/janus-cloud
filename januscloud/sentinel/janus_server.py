@@ -9,9 +9,9 @@ import uuid
 
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_SERVICE_UNAVAILABLE, JANUS_ERROR_BAD_GATEWAY
 from januscloud.common.utils import random_uint64, create_janus_msg, get_host_ip, get_monotonic_time
-from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
+from januscloud.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
     JANUS_SERVER_STATUS_MAINTENANCE, JANUS_SERVER_STATUS_HWM
-from januscloud.proxy.core.backend_session import BackendTransaction
+from januscloud.core.backend_session import BackendTransaction
 from januscloud.sentinel.process_mngr import PROC_RUNNING, PROC_STATUS_TEXT
 from januscloud.transport.ws import WSClient
 
@@ -20,21 +20,27 @@ log = logging.getLogger(__name__)
 
 class JanusServer(object):
 
-    def __init__(self, server_name, server_ip, ws_port, admin_ws_port=0,
+    def __init__(self, server_name, server_ip='127.0.0.1',
+                 public_ip='', ws_port=8188, admin_ws_port=0,
                  pingpong_interval=5, statistic_interval=10, request_timeout=10,
-                 hwm_threshold=0, admin_secret=''):
+                 hwm_threshold=0, admin_secret='',
+                 location='', isp=''):
         self.server_name = server_name
         if self.server_name is None or self.server_name == '':
             self.server_name = str(uuid.uuid1())   # for empty, use uuid as server name
         self.server_local_ip = server_ip
-        self.server_public_ip = server_ip
-        if server_ip == '127.0.0.1':
+        if server_ip == '':
+            self.server_local_ip = '127.0.0.1'
+        self.server_public_ip = public_ip
+        if public_ip == '127.0.0.1' or public_ip == '':
             self.server_public_ip = get_host_ip()
         self.ws_port = ws_port
         self.session_num = -1   # unknown initially
         self.handle_num = -1    # unknown initially
         self.start_time = 0
         self.status = JANUS_SERVER_STATUS_ABNORMAL
+        self.location = location
+        self.isp = isp
         self._in_maintenance = False
         self._admin_ws_port = admin_ws_port
         self._hwm_threshold = hwm_threshold

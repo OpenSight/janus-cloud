@@ -6,7 +6,7 @@ from januscloud.common.error import JanusCloudError, JANUS_ERROR_UNKNOWN_REQUEST
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
     FloatVal, AutoDel
-from januscloud.proxy.core.frontend_handle_base import FrontendHandleBase
+from januscloud.core.frontend_handle_base import FrontendHandleBase
 
 log = logging.getLogger(__name__)
 

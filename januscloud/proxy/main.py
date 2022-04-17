@@ -67,15 +67,15 @@ def do_main(config):
 
 
         # load the core
-        from januscloud.proxy.core.frontend_session import FrontendSessionManager
+        from januscloud.core.frontend_session import FrontendSessionManager
         frontend_session_mgr = FrontendSessionManager(session_timeout=config['general']['session_timeout'])
-        from januscloud.proxy.core.request import RequestHandler
+        from januscloud.core.request import RequestHandler
         request_handler = RequestHandler(frontend_session_mgr=frontend_session_mgr, proxy_conf=config)
-        from januscloud.proxy.core.backend_server import BackendServerManager
+        from januscloud.core.backend_server import BackendServerManager
         backend_server_manager = BackendServerManager(config['general']['server_select'],
                                                       config['janus_server'],
                                                       server_dao)
-        from januscloud.proxy.core.backend_session import set_api_secret
+        from januscloud.core.backend_session import set_api_secret
         set_api_secret(config['general']['api_secret'])
 
         # rest api config
@@ -88,7 +88,7 @@ def do_main(config):
 
 
         # load the plugins
-        from januscloud.proxy.core.plugin_base import register_plugin
+        from januscloud.core.plugin_base import register_plugin
         for plugin_str in config['plugins']:
             module_name, sep, factory_name = plugin_str.partition(':')
             module = importlib.import_module(module_name)

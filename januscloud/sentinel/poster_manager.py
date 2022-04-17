@@ -8,9 +8,9 @@ import gevent
 
 from januscloud.common.error import JanusCloudError, JANUS_ERROR_SERVICE_UNAVAILABLE, JANUS_ERROR_NOT_IMPLEMENTED
 from januscloud.common.utils import random_uint64, create_janus_msg, get_host_ip
-from januscloud.proxy.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
+from januscloud.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
     JANUS_SERVER_STATUS_MAINTENANCE
-from januscloud.proxy.core.backend_session import BackendTransaction
+from januscloud.core.backend_session import BackendTransaction
 from januscloud.sentinel.process_mngr import PROC_RUNNING
 from januscloud.transport.ws import WSClient
 
