@@ -16,7 +16,7 @@ requires = [
 ]
 
 setup(name='janus-cloud',
-      version='0.7.0',
+      version='0.8.0',
       license='AGPLv3',
       url='https://github.com/OpenSight/janus-cloud',
       description='Janus-cloud is a cluster solution for Janus WebRTC server, by API proxy approach',
