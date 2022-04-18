@@ -19,13 +19,6 @@ general:
   lock_rtp_forward: false                      # Whether the admin_key above should be enforced for RTP forwarding
                                                # requests too. Default is false.
 
-
-backend_sweeper:
-  enable: true                                 # if true, turn on the backend sweeper, the sweeper would check each
-                                               # backend server at intervals, and destroy all the idle rooms.
-                                               # Default is true
-  backend_idle_room_check_interval: 600        # the interval seconds for check, default is 600(10 minutes)
-
 rooms:
 # room_id = unique room ID
 # description = This is my awesome room

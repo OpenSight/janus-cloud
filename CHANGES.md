@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 * refactor for backend room management
 * januscloud.proxy.core move to januscloud.core
 * janus-sentinel support public ip, isp, location configuration
+* backend videoroom sweeper is moved from videoroom plugin to sentnel
 
 
  [v0.7.0]  - 2021-04-03

@@ -55,6 +55,18 @@ proc_watcher:
 
   poll_interval: 1                      # interval to check process status, default is 1
 
+videoroom_sweeper:
+  enable: true                          # if true, turn on the videoroom sweeper, the sweeper would check janus-server
+                                        # at intervals, and destroy all the idle rooms. Default is true
+
+  check_interval: 30                    # the interval seconds for check, default is 10 sec
+  
+  room_auto_destroy_timeout: 600        # the idle room would be destroyed automatically
+                                        # after "room_auto_destroy_timeout" sec. default is 600 sec
+										
+  des_filter: "januscloud-"             # only the rooms with description started with the given string 
+                                        # would auto destroyed. 
+
 log:
   log_to_stdout: true                   # Whether the Janus output should be written
                                         # to stdout or not (default=true)

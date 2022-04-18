@@ -61,11 +61,25 @@ class BackendHandle(object):
             self._session.on_handle_detached(self.handle_id)
             try:
                 detach_message = create_janus_msg('detach', handle_id=self.handle_id)
-                self._session.send_request(detach_message)
+                self._session.async_send_request(detach_message)
             except Exception:
                 log.exception('Detach backend handle {} error'.format(self.handle_id))
 
             self._session = None
+
+    def async_send_message(self, body, jsep=None):
+        if self._has_detach:
+            raise JanusCloudError('backend handle {} has been destroyed'.format(self.handle_id),
+                                  JANUS_ERROR_PLUGIN_DETACH)
+
+        params = dict()
+        params['body'] = body
+        if jsep:
+            params['jsep'] = jsep
+
+        message = create_janus_msg('message', handle_id=self.handle_id, **params)
+        self._session.async_send_request(message)
+
 
     def send_message(self, body, jsep=None):
         if self._has_detach:

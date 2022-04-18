@@ -46,6 +46,7 @@ Janus-sentinel is responsible to care for the Janus server, normally, it runs at
 - Monitor the status of the Janus server, and report it to Janus-proxy through HTTP
 - Calculate the workload of the Janus server
 - Support post the status/workload statistic to multi HTTP URL
+- Auto destroy for the idle video room
 
 Note: the process of the Janus server can be started and maintained by the other system tools or system administrator manual, instead of Janus-sentinel. In this case, Janus-sentinel is only responsible for monitoring Janus server's status by its WebSocket API. But this approach is not a good idea.
 

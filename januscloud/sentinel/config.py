@@ -36,7 +36,13 @@ config_schema = Schema({
         Optional("isp"): Default(StrVal(min_len=0, max_len=64), default=''),
         AutoDel(str): object  # for all other key remove
     }, default={}),
-
+    Optional("videoroom_sweeper"): Default({
+        Optional("enable"): Default(BoolVal(), default=True),
+        Optional("check_interval"): Default(IntVal(min=1, max=86400), default=30),
+        Optional("room_auto_destroy_timeout"): Default(IntVal(min=1, max=86400), default=600),
+        Optional("des_filter"): Default(StrVal(min_len=0, max_len=64), default='januscloud-'),
+        AutoDel(str): object  # for all other key remove
+    }, default={}),
     Optional("proc_watcher"): Default({
         Optional("cmdline"): Default(StrVal(), default=''),
         Optional("error_restart_interval"): Default(IntVal(min=0, max=86400), default=10),

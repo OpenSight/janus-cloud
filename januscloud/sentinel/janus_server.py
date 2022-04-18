@@ -11,7 +11,7 @@ from januscloud.common.error import JanusCloudError, JANUS_ERROR_SERVICE_UNAVAIL
 from januscloud.common.utils import random_uint64, create_janus_msg, get_host_ip, get_monotonic_time
 from januscloud.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
     JANUS_SERVER_STATUS_MAINTENANCE, JANUS_SERVER_STATUS_HWM
-from januscloud.core.backend_session import BackendTransaction
+from januscloud.core.backend_session import BackendTransaction, get_cur_sessions
 from januscloud.sentinel.process_mngr import PROC_RUNNING, PROC_STATUS_TEXT
 from januscloud.transport.ws import WSClient
 
@@ -172,6 +172,14 @@ class JanusServer(object):
                     pass
                 self._ws_client = None
 
+    def _get_self_session_ids(self):
+        self_session_ids = set()
+        self_sessions = get_cur_sessions()
+        for session in self_sessions:
+            if session.session_id:
+                self_session_ids.add(session.session_id)
+        return self_session_ids
+
     def query_stat(self):
         try:
             if self._admin_ws_client is None:
@@ -180,11 +188,16 @@ class JanusServer(object):
             common_args = {}
             if self._admin_secret:
                 common_args['admin_secret'] = self._admin_secret
+
+            self_session_ids = self._get_self_session_ids()
+
             response = self.send_request(self._admin_ws_client, create_janus_msg('list_sessions', **common_args))
             sessions = response.get('sessions', [])
             handles = []
             for session_id in sessions:
-
+                if session_id in self_session_ids:
+                    # for self session, not add to stat
+                    continue
                 response = self.send_request(self._admin_ws_client,
                                              create_janus_msg('list_handles', session_id=session_id, **common_args))
                 handles.extend(response.get('handles', []))

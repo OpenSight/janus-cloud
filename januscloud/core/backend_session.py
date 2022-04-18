@@ -133,6 +133,19 @@ class BackendSession(object):
     def on_handle_detached(self, handle_id):
         self._handles.pop(handle_id, None)
 
+    def async_send_request(self, msg):
+        if self.state == BACKEND_SESSION_STATE_DESTROYED:
+            raise JanusCloudError('Session has destroy for Janus server: {}'.format(self.url),
+                                  JANUS_ERROR_SERVICE_UNAVAILABLE)
+        transaction_id = self._genrate_new_tid()
+        send_msg = dict.copy(msg)
+        send_msg['session_id'] = self.session_id
+        send_msg['transaction'] = transaction_id
+        if self._api_secret:
+            send_msg['apisecret'] = self._api_secret  
+        log.debug('Send Async Request {} to Janus server: {}'.format(send_msg, self.url))
+        self._ws_client.send_message(send_msg)              
+
     def send_request(self, msg, ignore_ack=True, timeout=30):
 
         if self.state == BACKEND_SESSION_STATE_DESTROYED:
@@ -200,6 +213,8 @@ class BackendSession(object):
                 transaction = self._transactions.get(msg['transaction'], None)
                 if transaction:
                     transaction.response = msg
+                else:
+                    log.debug('Receive Async Response {} from Janus server: {}'.format(msg, self.url))
             elif msg['janus'] == 'timeout':
                 log.debug('Receive session timeout from Janus server: {}'.format(self.url))
                 self.destroy()
@@ -273,6 +288,8 @@ _sessions = {}
 
 _api_secret = ''
 
+def get_cur_sessions():
+    return list(_sessions.values())
 
 def get_backend_session(server_url, auto_destroy=False):
     session = _sessions.get(server_url)
