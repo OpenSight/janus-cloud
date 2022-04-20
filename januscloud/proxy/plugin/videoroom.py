@@ -701,8 +701,6 @@ class VideoRoomPublisher(object):
             backend_handle = self._backend_handle
             backend_room_id = self._backend_room_id
             self._backend_handle = None
-            self._backend_room_id = 0
-            self._backend_server = None
 
             # 1. leave the room
             try:
@@ -775,7 +773,6 @@ class VideoRoomPublisher(object):
         self._backend_room_id = backend_room_id
 
     def get_backend_server(self):
-        self._assert_valid()
         return self._backend_server, self._backend_room_id
 
     def _check_sdp_simulcast(self, sdp):
