@@ -12,14 +12,14 @@ log = logging.getLogger(__name__)
 stop_message = object()
 
 class HandleListener(object):
-    def on_async_event(self, event_msg):
+    def on_async_event(self, handle, event_msg):
         """ call when receive an async event from Janus server
         :param event_msg:
         :return:
         """
         pass
 
-    def on_close(self, handle_id):
+    def on_close(self, handle):
         """ call when the related session is destroyed
         :param handle_id:
         :return:
@@ -166,7 +166,7 @@ class BackendHandle(object):
 
         if self._handle_listener:
             try:
-                self._handle_listener.on_close(self.handle_id)
+                self._handle_listener.on_close(self)
             except Exception:
                 log.exception('on_close() exception for backend handle {}'.format(self.handle_id))
 
@@ -177,7 +177,7 @@ class BackendHandle(object):
                 return
             try:
                 if self._handle_listener:
-                    self._handle_listener.on_async_event(event_msg)
+                    self._handle_listener.on_async_event(self, event_msg)
             except Exception:
                 log.exception('Error when handle async event for backend handle {}'.format(self.handle_id))
 

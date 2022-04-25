@@ -388,13 +388,13 @@ class VideoRoomSubscriber(object):
             raise JanusCloudError('Can\'t offer an SDP with no audio, video or data',
                                   JANUS_VIDEOROOM_ERROR_INVALID_SDP)
 
-        backend_server, backend_room_id = publisher.get_backend_server()
-        if backend_server is None or backend_room_id == 0:
+        backend_room = publisher.get_backend_room()
+        if backend_room is None:
             raise JanusCloudError('No such feed ({})'.format(publisher.user_id),
                                   JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
 
         # backend session
-        backend_session = get_backend_session(backend_server.url,
+        backend_session = get_backend_session(backend_room.server_url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
 
         # attach backend handle
@@ -561,7 +561,7 @@ class VideoRoomSubscriber(object):
         if self._backend_handle:
             self._backend_handle.send_trickle(candidate=candidate, candidates=candidates)
 
-    def on_async_event(self, event_msg):
+    def on_async_event(self, handle, event_msg):
         if self._has_destroyed:
             return
 
@@ -614,7 +614,7 @@ class VideoRoomSubscriber(object):
             if self._frontend_handle:
                 self._frontend_handle.push_event(event_msg['janus'], None, **params)
 
-    def on_close(self, handle_id):
+    def on_close(self, handle):
         if self._has_destroyed:
             return
         self._backend_handle = None     #detach with backend handle
@@ -666,9 +666,8 @@ class VideoRoomPublisher(object):
         self._record_active = None
 
         # backend handle info
-        self._backend_server = None
         self._backend_handle = None
-        self._backend_room_id = 0
+        self._backend_room = None
 
         self._has_destroyed = False
 
@@ -691,6 +690,11 @@ class VideoRoomPublisher(object):
 
         self._rtp_forwarders.clear()
 
+
+        if self._backend_room:
+            self._backend_room.del_publisher(self.user_id)
+            self._backend_room = None
+
         if self.room:
             # remove from room
             self.room.on_participant_destroy(self.user_id)
@@ -699,19 +703,23 @@ class VideoRoomPublisher(object):
 
         if self._backend_handle:
             backend_handle = self._backend_handle
-            backend_room_id = self._backend_room_id
+
             self._backend_handle = None
 
+
+            # detach backend handle directly to make destroy() faster
             # 1. leave the room
-            try:
-                backend_handle.send_message({
-                    'request': 'leave',
-                })
-            except Exception:
-                pass  # ignore leave failed
+            # try:
+            #     backend_handle.send_message({
+            #         'request': 'leave',
+            #     })
+            # except Exception:
+            #     pass  # ignore leave failed
 
             # 2. detach the backend_handle
             backend_handle.detach()
+
+
 
         if self.webrtc_started:
             self.webrtc_started = False
@@ -735,7 +743,7 @@ class VideoRoomPublisher(object):
             raise JanusCloudError('Already destroyed {} ({})'.format(self.user_id, self.display),
                                   JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED)
 
-    def connect_backend(self, backend_server, backend_room_id):
+    def connect_backend(self, backend_room):
         self._assert_valid()
         if self._backend_handle is not None:
             raise JanusCloudError('Already construct backend handle {} ({})'.format(self.user_id, self.display),
@@ -746,7 +754,7 @@ class VideoRoomPublisher(object):
 
         
         # backend session
-        backend_session = get_backend_session(backend_server.url,
+        backend_session = get_backend_session(backend_room.server_url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
 
         # attach backend handle
@@ -757,7 +765,7 @@ class VideoRoomPublisher(object):
             body = {
                 'request':  'join',
                 'ptype': 'publisher',
-                'room': backend_room_id,
+                'room': backend_room.backend_room_id,
                 'id': self.user_id
             }
             if self.display:
@@ -768,12 +776,12 @@ class VideoRoomPublisher(object):
             backend_handle.detach()
             raise
 
-        self._backend_server = backend_server
         self._backend_handle = backend_handle
-        self._backend_room_id = backend_room_id
+        self._backend_room = backend_room
+        backend_room.add_publisher(self.user_id)
 
-    def get_backend_server(self):
-        return self._backend_server, self._backend_room_id
+    def get_backend_room(self):
+        return self._backend_room
 
     def _check_sdp_simulcast(self, sdp):
         # check fro rid (firefox support)
@@ -1033,7 +1041,7 @@ class VideoRoomPublisher(object):
             # add local_rtcp_host key
             if 'local_rtcp_port' in backend_rtp_forwarder and \
                'local_rtcp_host' not in backend_rtp_forwarder:
-                backend_rtp_forwarder['local_rtcp_host'] = urlparse(self._backend_server.url).hostname
+                backend_rtp_forwarder['local_rtcp_host'] = urlparse(self._backend_room.server_url).hostname
 
             self._rtp_forwarders[stream_id] = backend_rtp_forwarder
 
@@ -1087,13 +1095,13 @@ class VideoRoomPublisher(object):
         for subscriber in subscriptions:
             subscriber.kick()
 
-    def enable_recording(self, record):
+    def async_enable_recording(self, record):
         self._assert_valid()
         if self._backend_handle is None:
             raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
                                   JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
 
-        log.debug('Enable recording: {} for user {} ({}) of room {}'.
+        log.debug('Async Enable recording: {} for user {} ({}) of room {}'.
                   format(record, self.user_id, self.display, self.room_id))
 
         # send request to backend
@@ -1101,7 +1109,7 @@ class VideoRoomPublisher(object):
             'request': 'configure',
             'record': record
         }
-        _send_backend_message(self._backend_handle, body=body)
+        self._backend_handle.async_send_message(body)
 
         self._record_active = record
 
@@ -1144,7 +1152,7 @@ class VideoRoomPublisher(object):
         if self._backend_handle:
             self._backend_handle.send_trickle(candidate=candidate, candidates=candidates)
 
-    def on_async_event(self, event_msg):
+    def on_async_event(self, handle, event_msg):
         if self._has_destroyed:
             return
         if self._backend_handle is None:
@@ -1291,13 +1299,11 @@ class VideoRoomPublisher(object):
             if self._frontend_handle:
                 self._frontend_handle.push_event(event_msg['janus'], None, **params)
 
-    def on_close(self, handle_id):
+    def on_close(self, handle):
         if self._has_destroyed:
             return
 
         self._backend_handle = None #detach with backend handle
-        self._backend_room_id = 0
-        self._backend_server = None
 
         if self.room:
             self.room.kick_participant(self.user_id)
@@ -1305,12 +1311,15 @@ class VideoRoomPublisher(object):
         self.destroy()
 
 class BackendRoom(object):
+
+    _backend_handles =  {}
+
     def __init__(self, backend_server, backend_room_id, backend_admin_key=''):
         self.backend_room_id = backend_room_id
         self.server_name = backend_server.name
         self.server_url = backend_server.url
         self._backend_admin_key = backend_admin_key
-        self._backend_handle = None
+        self._backend_publishers = set()
         self._has_destroyed = False
 
         # the edit params cache
@@ -1329,21 +1338,20 @@ class BackendRoom(object):
             return
         self._has_destroyed = True
 
-        if self._backend_handle is None: 
+        backend_handle = BackendRoom._backend_handles.get(self.server_name)
+
+        if backend_handle is None: 
             # this backend room is inactive
             log.debug('Backend room "{}"({}) is destroyed without backend sync'.format(
                 self.backend_room_id, 
                 self.server_url))             
             return
 
-        backend_handle = self._backend_handle
-        self._backend_handle = None
-
         try:
             # 1 destroy the room of the backend server
             if backend_handle:
-                # 2. destroy backend room
-                backend_handle.send_message({
+                # 2. async destroy backend room
+                backend_handle.async_send_message({
                     'request': 'destroy',
                     'room': self.backend_room_id
                 })
@@ -1351,10 +1359,7 @@ class BackendRoom(object):
             log.exception('Backend room "{}"({}) failed to destroyed: {}, ignore'.
                     format(self.backend_room_id, self.server_url, str(e)))             
             pass   # ignore destroy failed
-        finally:
-            # 3. detach handle
-            if backend_handle:
-                backend_handle.detach()  
+
         
         log.debug('Backend room "{}"({}) is destroyed'.
                     format(self.backend_room_id, self.server_url)) 
@@ -1364,18 +1369,31 @@ class BackendRoom(object):
             raise JanusCloudError('No such backend room "{}" ({})'.format(
                 self.backend_room_id, self.server_url),
                 JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)
+        
+        backend_handle = BackendRoom._backend_handles.get(self.server_name)
 
-        if self._backend_handle:
+        if backend_handle:
             # active
-            
-            if not self._check_exist(self._backend_handle): 
+            if self._backend_publishers:
+                # There are stll some publishers in this backend room,
+                # not needed to check
+                return 
+            elif  not self._check_exist(backend_handle): 
+                
+                try:
+                    # re-create it if non-exist
+                    self._create_backend(backend_handle, room)
 
-                # re-create it if non-exist
-                self._create_backend(self._backend_handle, room)
+                    self._backend_publishers.clear() # surely no publishers for new backend room
 
-                log.debug('Backend room "{}"({}) is re-created on the backend'.format(
-                            self.backend_room_id, 
-                            self.server_url))    
+                    log.debug('Backend room "{}"({}) is re-created on the backend'.format(
+                                self.backend_room_id, 
+                                self.server_url))    
+                except Exception as e:
+                    if e.code == JANUS_VIDEOROOM_ERROR_ROOM_EXISTS:
+                        pass # the room already exist, continue
+                    else:
+                        raise
         else: 
             # non-active
 
@@ -1384,12 +1402,18 @@ class BackendRoom(object):
             backend_session = get_backend_session(self.server_url,
                                                     auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
             # 2. attach backend handle
-            backend_handle = backend_session.attach_handle(JANUS_VIDEOROOM_PACKAGE, handle_listener=self)
+            backend_handle = backend_session.attach_handle(
+                JANUS_VIDEOROOM_PACKAGE, 
+                opaque_id=self.server_name,
+                handle_listener=BackendRoom)
+            
 
             try:
                 # 3. create room. 
                 # If non-active, the room likely to be absent, try to create it firstly
                 self._create_backend(backend_handle, room)
+
+                self._backend_publishers.clear() # surely no publishers for new backend room
 
             except Exception as e:
                 if e.code == JANUS_VIDEOROOM_ERROR_ROOM_EXISTS:
@@ -1412,18 +1436,18 @@ class BackendRoom(object):
 
                     _send_backend_message(backend_handle, body=body)  
 
-            except Exception:
+            except Exception as e:
                 if backend_handle:
                     backend_handle.detach()
                 raise
 
             # make active with protection for multi greenlet
-            if self._backend_handle is None and not self._has_destroyed:
-                self._backend_handle = backend_handle
+            if self.server_name not in BackendRoom._backend_handles:
+                BackendRoom._backend_handles[self.server_name] = backend_handle
             else:
                 backend_handle.detach()  
 
-            log.debug('Backend room "{}"({}) is activated on the backend'.format(
+            log.debug('Backend room "{}"({}) is (re)activated on the backend'.format(
                         self.backend_room_id, 
                         self.server_url)) 
  
@@ -1434,7 +1458,9 @@ class BackendRoom(object):
         if new_bitrate is None and new_rec_dir is None:
             return # no need to edit
 
-        if self._backend_handle is None: 
+        backend_handle = BackendRoom._backend_handles.get(self.server_name)
+
+        if backend_handle is None: 
             # inactive, cache the new params for next activation
             if new_bitrate is not None:
                 self._edit_cache['new_bitrate'] = new_bitrate
@@ -1459,7 +1485,7 @@ class BackendRoom(object):
             body['new_rec_dir'] = new_rec_dir
 
         try:
-            _send_backend_message(self._backend_handle, body=body)
+            _send_backend_message(backend_handle, body=body)
 
             log.debug('Backend room "{}"({}) is edited'.format(
                     self.backend_room_id, 
@@ -1474,6 +1500,11 @@ class BackendRoom(object):
                 pass
             else:
                 raise   
+    def add_publisher(self, user_id):
+        self._backend_publishers.add(user_id)
+
+    def del_publisher(self, user_id):
+        self._backend_publishers.discard(user_id)
 
     def _check_exist(self, backend_handle):
             # 3. check exist on backend server
@@ -1525,16 +1556,17 @@ class BackendRoom(object):
         self._edit_cache.clear()
 
     # backend handle listener callback
-    def on_async_event(self, event_msg):
+    @classmethod
+    def on_async_event(cls, handle, event_msg):
         # no event need to process for the backend room control handle
         pass
-
-    def on_close(self, handle_id):
-        if self._backend_handle != None and self._backend_handle.handle_id == handle_id:
-            self._backend_handle = None # clean up the handle
-            log.debug('Backend room "{}"({}) is deactivated'.format(
-                self.backend_room_id, 
-                self.server_url)) 
+    
+    @classmethod
+    def on_close(cls, handle):
+        server_name = handle.opaque_id
+        cached_handle = cls._backend_handles.get(server_name)
+        if cached_handle == handle:
+            cls._backend_handles.pop(server_name, None)
 
 
 
@@ -1741,10 +1773,24 @@ class VideoRoom(object):
 
         if need_update:
             backend_rooms = list(self._backend_rooms.values())
+            greenlets = []
             for backend_room in backend_rooms:
-                backend_room.edit(new_bitrate=new_bitrate, new_rec_dir=new_rec_dir)
+                greenlet = gevent.spawn(
+                    backend_room.edit, 
+                    new_bitrate=new_bitrate, 
+                    new_rec_dir=new_rec_dir
+                )
+                greenlets.append(greenlet)
+            # executes concurrently and wait for all finished
+            gevent.joinall(greenlets, timeout=30)
 
-
+            # check results
+            for index, greenlet in enumerate(greenlets):
+                if not greenlet.successful():
+                    backend_room = backend_rooms[index]
+                    e = greenlet.exception if greenlet.exception is not None else 'Timeout'
+                    log.warning('Exception when edit {} of room {} : {}, ignore it'.format(
+                        backend_room, self.room_id, e))
         
     def activate_backend_room(self, backend_server):
         backend_room = self._backend_rooms.get(backend_server.name)
@@ -1756,6 +1802,8 @@ class VideoRoom(object):
             self._backend_rooms[backend_server.name] = backend_room
             
         backend_room.activate(self)
+
+        return backend_room
 
 
 
@@ -1781,6 +1829,8 @@ class VideoRoom(object):
                                       JANUS_VIDEOROOM_ERROR_ID_EXISTS)
 
         log.debug('  -- Publisher ID: {}'.format(user_id))
+
+
         publisher = VideoRoomPublisher(user_id=user_id, handle=handle,
                                        display=display)
         try:
@@ -1790,10 +1840,10 @@ class VideoRoom(object):
             self._creating_user_id.add(user_id)
 
             # activate backend room
-            self.activate_backend_room(backend_server) 
+            backend_room = self.activate_backend_room(backend_server) 
 
             # connect to backend
-            publisher.connect_backend(backend_server, self._backend_room_id)
+            publisher.connect_backend(backend_room)
 
         except Exception:
             publisher.room = None
@@ -1914,6 +1964,8 @@ class VideoRoom(object):
             return  # already removed
         self._private_id.pop(publisher.pvt_id, None)
 
+
+
 #        if publisher.webrtc_started:
 #            event = {
 #                'videoroom': 'event',
@@ -1932,6 +1984,10 @@ class VideoRoom(object):
         self.check_idle()
 
     def notify_other_participants(self, src_participant, event):
+        
+        if self._has_destroyed: # if destroyed, just return
+            return
+
         participant_list = list(self._participants.values())
         for publisher in participant_list:
             if publisher != src_participant:
@@ -1964,11 +2020,11 @@ class VideoRoom(object):
         if self.record != record:   # record state changed
             self.record = record
 
-            # enable recording of the exist participants
+            # async enable recording of the exist participants concurrently
             participant_list = list(self._participants.values())
             for publisher in participant_list:
                 try:
-                    publisher.enable_recording(record)
+                    publisher.async_enable_recording(record)
                 except Exception as e:
                     log.warning('Exception when enable recording for publisher {} ({}) of room {} : {}, ignore it'.format(
                         publisher.user_id, publisher.display, self.room_id, e))
@@ -3240,11 +3296,12 @@ def get_videoroom_participant_list(request):
         if publisher.webrtc_started:
             part_info['subscribers'] = publisher.subscriber_num()
 
-        server, backend_room_id = publisher.get_backend_server()
-        if server:
-            part_info['backend_server'] = '{} ({})'.format(server.name, server.url)
-        if backend_room_id:
-            part_info['backend_room_id'] = backend_room_id
+        backend_room = publisher.get_backend_room()
+        if backend_room:
+            part_info['backend_server'] = '{} ({})'.format(
+                backend_room.server_name, 
+                backend_room.server_url)
+            part_info['backend_room_id'] = backend_room.backend_room_id
 
         part_info_list.append(part_info)
 

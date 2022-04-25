@@ -377,7 +377,7 @@ class VideoCallHandle(FrontendHandleBase):
                               'error':str(e),
                               }, transaction=transaction)
 
-    def on_async_event(self, event_msg):
+    def on_async_event(self, handle, event_msg):
         if self._has_destroy:
             return
         if event_msg['janus'] == 'event':
@@ -444,7 +444,7 @@ class VideoCallHandle(FrontendHandleBase):
                     params[key] = value
             self._push_event(event_msg['janus'], None, **params)
 
-    def on_close(self, handle_id):
+    def on_close(self, handle):
         self.backend_handle = None #detach with backend handle
 
         if self._auto_disconnect_greenlet:

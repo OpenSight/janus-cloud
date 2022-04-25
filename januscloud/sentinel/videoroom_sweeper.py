@@ -171,12 +171,12 @@ class VideoroomSweeper(object):
         self._server_status = new_state
 
     # backend handle listener callback
-    def on_async_event(self, event_msg):
+    def on_async_event(self, handle, event_msg):
         # no event need to process for the backend room control handle
         pass
 
-    def on_close(self, handle_id):
-        if self._handle != None and self._handle.handle_id == handle_id:
+    def on_close(self, handle):
+        if self._handle != None and self._handle == handle:
             self._handle = None # clean up the handle
  
 
