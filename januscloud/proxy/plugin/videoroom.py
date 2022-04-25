@@ -412,7 +412,7 @@ class VideoRoomSubscriber(object):
             body = {
                 'request':  'join',
                 'ptype': 'subscriber',
-                'room': backend_room_id,
+                'room': backend_room.backend_room_id,
                 'feed': publisher.user_id,
                 'close_pc': close_pc,
                 'audio': audio,
@@ -992,7 +992,7 @@ class VideoRoomPublisher(object):
         # send request to backend
         body = {
             'request': 'rtp_forward',
-            'room': self._backend_room_id,
+            'room': self._backend_room.backend_room_id,
             'publisher_id': self.user_id,
             'host': host
         }
@@ -1016,7 +1016,7 @@ class VideoRoomPublisher(object):
         # get the new forwarder info
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body={
             'request': 'listforwarders',
-            'room': self._backend_room_id,
+            'room': self._backend_room.backend_room_id,
         })
         backend_rtp_forwarders = []
         for publisher in reply_data.get('rtp_forwarders', []):
@@ -1060,7 +1060,7 @@ class VideoRoomPublisher(object):
         # send request to backend
         body = {
             'request': 'stop_rtp_forward',
-            'room': self._backend_room_id,
+            'room': self._backend_room.backend_room_id,
             'publisher_id': self.user_id,
             'stream_id': stream_id
         }
@@ -1122,7 +1122,7 @@ class VideoRoomPublisher(object):
         # send request to backend
         body = {
             'request': 'moderate',
-            'room': self._backend_room_id,
+            'room': self._backend_room.backend_room_id,
             'id': self.user_id,
         }
         if mute_audio is not None:
@@ -1723,11 +1723,14 @@ class VideoRoom(object):
         }
         # log.debug("after clear, len of participants is {}".format(len(participants)))
         for publisher in participants:
-            # log.debug('destroy publisher user_id {}'.format(publisher.user_id))
-            publisher.push_videoroom_event(destroyed_event)
             publisher.room = None    # already removed from room, no need to call back room's on_participant destroy()
             publisher.room_id = 0
-            publisher.destroy()
+
+            # log.debug('destroy publisher user_id {}'.format(publisher.user_id))
+            publisher.push_videoroom_event(destroyed_event)
+
+            # according to janus-gateway,  don't destory the publisherswhen room is destroyed
+            # publisher.destroy() 
 
         log.debug("all backend rooms of Room {} are destroyed".format(
             self.room_id)
