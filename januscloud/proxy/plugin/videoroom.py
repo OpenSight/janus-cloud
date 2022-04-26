@@ -996,8 +996,8 @@ class VideoRoomPublisher(object):
             'publisher_id': self.user_id,
             'host': host
         }
-        if self.room and self.room.get_backend_admin_key():
-            body['admin_key'] = self.room.get_backend_admin_key()
+        if self._backend_room.backend_admin_key:
+            body['admin_key'] = self._backend_room.backend_admin_key
         if len(kwargs) > 0:
             for k, v in kwargs.items():
                 if k not in body:
@@ -1064,8 +1064,8 @@ class VideoRoomPublisher(object):
             'publisher_id': self.user_id,
             'stream_id': stream_id
         }
-        if self.room and self.room.get_backend_admin_key():
-            body['admin_key'] = self.room.get_backend_admin_key()
+        if self._backend_room.backend_admin_key:
+            body['admin_key'] = self._backend_room.backend_admin_key
 
 
         _send_backend_message(self._backend_handle, body=body)
@@ -1304,6 +1304,7 @@ class VideoRoomPublisher(object):
             return
 
         self._backend_handle = None #detach with backend handle
+     
 
         if self.room:
             self.room.kick_participant(self.user_id)
@@ -1318,7 +1319,7 @@ class BackendRoom(object):
         self.backend_room_id = backend_room_id
         self.server_name = backend_server.name
         self.server_url = backend_server.url
-        self._backend_admin_key = backend_admin_key
+        self.backend_admin_key = backend_admin_key
         self._backend_publishers = set()
         self._has_destroyed = False
 
@@ -1543,8 +1544,8 @@ class BackendRoom(object):
         }
         if room.description:
             body['description'] = 'januscloud-{}'.format(room.description)
-        if self._backend_admin_key:
-            body['admin_key'] = self._backend_admin_key
+        if self.backend_admin_key:
+            body['admin_key'] = self.backend_admin_key
         if room.h264_profile:
             body['h264_profile'] = room.h264_profile
         if room.vp9_profile:

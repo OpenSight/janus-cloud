@@ -58,14 +58,15 @@ class BackendHandle(object):
         self._async_event_greenlet = None
 
         if self._session:
-            self._session.on_handle_detached(self.handle_id)
+            session = self._session
+            self._session = None
+            session.on_handle_detached(self.handle_id)
             try:
                 detach_message = create_janus_msg('detach', handle_id=self.handle_id)
-                self._session.async_send_request(detach_message)
+                session.async_send_request(detach_message)
             except Exception:
                 log.exception('Detach backend handle {} error'.format(self.handle_id))
 
-            self._session = None
 
     def async_send_message(self, body, jsep=None):
         if self._has_detach:

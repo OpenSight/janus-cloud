@@ -85,7 +85,9 @@ def load_conf(path):
         if path is None or path == '':
             config['general']['configs_folder'] = '/etc/janus-cloud'
         else:
-            config['general']['configs_folder'] = os.path.dirname(path)
+            config['general']['configs_folder'] = os.path.dirname(os.path.abspath(path))
+
+    # print('configs_folders: {}'.format(config['general']['configs_folder']))
 
     return config
 

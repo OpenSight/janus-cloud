@@ -32,10 +32,10 @@ class FrontendSession(object):
     def notify_event(self, event):
         try:
             if self.ts:
-                log.debug('an asynchronous event messge ({}) is sent back asynchronous for session "{}" '.format(event, self.session_id))
                 self.ts.send_message(event)
+                log.debug('an asynchronous event messge ({}) is sent back asynchronous for session "{}" '.format(event, self.session_id))
         except Exception as e:
-            log.exception('Asynchronous event ({}) transport failed on session (id:{})'.format(event, self.session_id))
+            log.debug('Failed to send backe Asynchronous event ({}) on session (id:{}): {}, Ignore'.format(event, self.session_id, e))
 
     def destroy(self):
         """ destroy the session
