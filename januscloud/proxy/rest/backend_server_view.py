@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from januscloud.core.backend_server import JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_NORMAL, \
-    JANUS_SERVER_STATUS_MAINTENANCE
+    JANUS_SERVER_STATUS_MAINTENANCE, JANUS_SERVER_STATUS_HWM
 from januscloud.proxy.rest.common import get_view, post_view, delete_view, get_params_from_request
 from januscloud.common.schema import Schema, Optional, DoNotCare, \
     Use, IntVal, Default, SchemaError, BoolVal, StrRe, ListVal, Or, STRING, \
@@ -24,7 +24,10 @@ def get_backend_server_list(request):
 server_update_schema = Schema({
     'name': StrRe('^[\w-]{1,64}$'),
     'url': StrRe('^(ws|wss)://\S+$'),
-    'status': IntVal(values=(JANUS_SERVER_STATUS_NORMAL, JANUS_SERVER_STATUS_ABNORMAL, JANUS_SERVER_STATUS_MAINTENANCE)),
+    'status': IntVal(values=(JANUS_SERVER_STATUS_NORMAL, 
+                             JANUS_SERVER_STATUS_ABNORMAL, 
+                            JANUS_SERVER_STATUS_MAINTENANCE,
+                            JANUS_SERVER_STATUS_HWM)),
     Optional("session_timeout"): IntVal(min=0, max=86400),
     Optional("session_num"): IntVal(min=0, max=10000),
     Optional("handle_num"): IntVal(min=0, max=100000),
