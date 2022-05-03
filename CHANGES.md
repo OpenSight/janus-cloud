@@ -3,7 +3,7 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
- [v0.8.0]  - unreleased
+ [v0.8.0]  - 2022-05-03
 ---------------------------------
 
 * refactor for backend room management
