@@ -81,7 +81,9 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - subscriber switch not support
 - string_ids not support
 
-Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.12.0(2022-03-03).
+The videoroom plugin of Janus-gateway has refactored with the new multistream API primitive since v1.0.0, so this plugin also need to refactored to support it.
+The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.1 util v1.0.1(2022-05-03). 
+If you want to deploy the Janus-proxy with the old Janus-gateway which version is lower than v1.0.0 and make use of the old API (without multistream), please use the 0.x version (from 0.x branch) of Janus-cloud 
 
 5 Topology
 -----------------
@@ -211,6 +213,8 @@ janus-cloud/
     +----LICENSE          AGPL 3.0 license 
     |
     +----MANIFEST.in      Manifest file describing the static resource file
+    |
+    +----pyproject.toml   python project building description file (compatible with PEP 518 / PEP 517)
     |
     +----setup.py         Python setup script
 ```

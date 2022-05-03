@@ -91,6 +91,8 @@ class FrontendHandleBase(object):
         raise JanusCloudError('async message handler not support\'message\'', JANUS_ERROR_PLUGIN_MESSAGE)
 
     def _push_plugin_event(self, data, jsep=None, transaction=None):
+        if data is None:
+            return
         params = dict()
         params['plugindata'] = {
             'plugin': self.plugin_package_name,
