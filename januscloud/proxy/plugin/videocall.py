@@ -135,20 +135,20 @@ class VideoCallHandle(FrontendHandleBase):
             backend_handle.detach()
 
     def handle_hangup(self):
-        log.debug('handle_hangup for videocall Handle {}'.format(self.handle_id))
+        # log.debug('handle_hangup for videocall Handle {}'.format(self.handle_id))
         if self.backend_handle:
             self.backend_handle.send_hangup()
 
     def handle_message(self, transaction, body, jsep=None):
-        log.debug('handle_message for videocall handle {}. transaction:{} body:{} jsep:{}'.
-                 format(self.handle_id, transaction, body, jsep))
+        # log.debug('handle_message for videocall handle {}. transaction:{} body:{} jsep:{}'.
+        #         format(self.handle_id, transaction, body, jsep))
 
         self._enqueue_async_message(transaction, body, jsep)
         return JANUS_PLUGIN_OK_WAIT, None
 
     def handle_trickle(self, candidate=None, candidates=None):
-        log.debug('handle_trickle for videocall handle {}.candidate:{} candidates:{}'.
-                  format(self.handle_id, candidate, candidates))
+        # log.debug('handle_trickle for videocall handle {}.candidate:{} candidates:{}'.
+        #          format(self.handle_id, candidate, candidates))
 
         if self.videocall_user is None or self.videocall_user.incall == False:
             if candidates:
