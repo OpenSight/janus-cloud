@@ -19,7 +19,7 @@ Second, Janus processes the WebRTC signalling, as well as the media data. But in
 - Scalable, Janus media servers can be added/removed to/from the cluster dynamically
 - Support Janus media service self-register, service monitor, circuit breaker
 - Pluggable, support the new features through developing the new plugin
-- Consistent API with the Janus server (until v0.10.7), which is compatible with the original client of the Janus server
+- Consistent API with the Janus server (since 1.0.1 (2022-05-03). ), which is compatible with the original client of the Janus server
 
 
 3 Components
