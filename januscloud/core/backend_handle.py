@@ -174,10 +174,10 @@ class BackendHandle(object):
     def _async_event_handler_routine(self):
         while True:
             if self._has_detach and self._async_event_queue.empty():
-                return
+                break
             event_msg = self._async_event_queue.get()
             if event_msg == stop_message:
-                return
+                break
             try:
                 if self._handle_listener:
                     self._handle_listener.on_async_event(self, event_msg)
