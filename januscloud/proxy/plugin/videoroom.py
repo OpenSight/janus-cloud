@@ -319,6 +319,12 @@ subscriber_unsubscribe_schema = Schema({
     AutoDel(str): object  # for all other key we must delete
 })
 
+subscriber_update_schema = Schema({
+    Optional('subscribe'): ListVal(subscriber_stream_schema), 
+    Optional('unsubscribe'): ListVal(subscriber_del_stream_schema),  
+    AutoDel(str): object  # for all other key we must delete
+})
+
 subscriber_configure_schema = Schema({
 
     Optional('mid'): StrVal(max_len=32),
@@ -367,7 +373,7 @@ def _send_backend_message(backend_handle, body, jsep=None):
 class SubscriberStream(object):
     def __init__(self, mindex: int, type: str, mid: str, 
                  active=False, ready=False, send=False,
-                 sources=0, 
+                 sources=0, source_ids=[],
                  feed_id=0, feed_display='', feed_mid='',
                  feed_description='',
                  codec='', 
@@ -382,6 +388,7 @@ class SubscriberStream(object):
         self.ready = ready
         self.send = send
         self.sources = sources
+        self.source_ids = source_ids
         self.feed_id = feed_id
         self.feed_display = feed_display
         self.feed_mid = feed_mid
@@ -526,7 +533,7 @@ class VideoRoomSubscriber(object):
         self.streams_bymid.clear()
         room = self.room_wref()
         self._media_feed_ids.clear()
-        data_feeds_existed = False
+        self._data_feed_ids.clear()
         
         for index, stream_info in enumerate(streams_info):
             stream_info = dict(stream_info)
@@ -543,30 +550,29 @@ class VideoRoomSubscriber(object):
             self.streams.append(stream)
             self.streams_bymid[stream.mid] = stream
             
-            if stream.type == 'data' and stream.sources:
-                data_feeds_existed = True
-
-            # update the feed info according to janus-proxy
-            if stream.feed_id and room is not None and room.user_id_exists(stream.feed_id):
-                if stream.type != 'data':
-                    self._media_feed_ids.add(stream.feed_id)
-                
-                # update the feed info 
-                publisher = room.get_participant_by_user_id(stream.feed_id)
-                stream.feed_display = publisher.display
-                if stream.feed_mid:
-                    if self._is_cascade(publisher):
-                        feed_index = int(stream.feed_mid)
-                        if feed_index < len(publisher.streams):
-                            ps = publisher.streams[feed_index]
-                            stream.feed_mid = ps.mid
-                            stream.feed_description = ps.description
-                    else:
-                        ps = publisher.streams_bymid.get(stream.feed_mid)
-                        if ps:
-                            stream.feed_description = ps.description
-        if not data_feeds_existed:
-            self._data_feed_ids.clear()
+            if stream.type == 'data':
+                # data stream
+                if stream.source_ids:
+                    self._data_feed_ids.update(stream.source_ids)
+            else:
+                # media stream
+                self._media_feed_ids.add(stream.feed_id)
+                # update the feed info according to janus-proxy
+                if stream.feed_id and room is not None and room.user_id_exists(stream.feed_id):
+                    # update the feed info 
+                    publisher = room.get_participant_by_user_id(stream.feed_id)
+                    stream.feed_display = publisher.display
+                    if stream.feed_mid:
+                        if self._is_cascade(publisher):
+                            feed_index = int(stream.feed_mid)
+                            if feed_index < len(publisher.streams):
+                                ps = publisher.streams[feed_index]
+                                stream.feed_mid = ps.mid
+                                stream.feed_description = ps.description
+                        else:
+                            ps = publisher.streams_bymid.get(stream.feed_mid)
+                            if ps:
+                                stream.feed_description = ps.description
 
         # sync *_feed_ids to _feeds
         self._sync_feeds()
@@ -585,6 +591,8 @@ class VideoRoomSubscriber(object):
             if stream.type == 'data':
                 if stream.sources:
                     info['sources'] = stream.sources
+                if stream.source_ids:
+                    info['source_ids'] = stream.source_ids
             else:
                 if stream.feed_id:
                     info['feed_id'] = stream.feed_id
@@ -623,7 +631,6 @@ class VideoRoomSubscriber(object):
                                   JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND)
         
         publishers = []
-        data_feed_ids = set()
         if streams:
             # for new multi-stream API check all stream's feed
             feed_ids = set()
@@ -633,19 +640,13 @@ class VideoRoomSubscriber(object):
                 if publisher is None or not publisher.webrtc_started:
                     raise JanusCloudError('No such feed ({})'.format(feed),
                                         JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
-                
                 mid = stream.get('mid', '')  
                 if mid:
-                    if mid in publisher.streams_bymid:
-                        ps = publisher.streams_bymid[mid]
-                        if ps.type == 'data': 
-                            data_feed_ids.add(feed)
-                    else:
+                    if mid not in publisher.streams_bymid:
                         raise JanusCloudError('No such mid \'{}\' in feed ({})'.format(mid, feed),
                                         JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
-                else:
-                    if publisher.data_stream:
-                        data_feed_ids.add(feed)
+                
+
 
                 if publisher.streams and feed not in feed_ids:
                     feed_ids.add(feed)
@@ -664,7 +665,6 @@ class VideoRoomSubscriber(object):
             stream_num = 0
             for ps in publisher.streams:
                 if ps.type == 'data' and do_data: 
-                    data_feed_ids.add(feed)
                     stream_num += 1
                 elif ps.type == 'video' and do_video:
                     stream_num += 1
@@ -736,15 +736,8 @@ class VideoRoomSubscriber(object):
                 if self.sdp:
                     self._wait_sdp_answer = True  
 
-            # add the data feeds
-            self._data_feed_ids.update(data_feed_ids)
-
             if 'streams' in reply_data:
                 self._update_streams(reply_data['streams'])   
-                # because _update_streams already call _sync_feeds(), no need to call _sync_feed again
-                # self._sync_feeds()
-            else:
-                self._sync_feeds()
 
             return reply_jsep
 
@@ -771,31 +764,28 @@ class VideoRoomSubscriber(object):
             raise JanusCloudError('Empty subscription list',
                                   JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
 
-        new_data_feed_ids = set()       
         for stream in streams:
             feed = stream.get('feed', 0)
             publisher = room.get_participant_by_user_id(feed)
             if publisher is None or not publisher.webrtc_started:
                 raise JanusCloudError('No such feed ({})'.format(feed),
                                     JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
+
+            if feed not in self._feeds:
+                raise JanusCloudError("Can only subcribe one feed in non-cascade mode",
+                                    JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
+
             mid = stream.get('mid', '')  
             if mid:
                 # only subscribe one stream
                 if mid in publisher.streams_bymid:
                     ps = publisher.streams_bymid[mid]
-                    if ps.type == 'data': 
-                        new_data_feed_ids.add(feed)
-
                     # change mid to backend mid if needed
                     if self._is_cascade(publisher=publisher):
                         stream['mid'] = '{}'.format(ps.mindex)                       
                 else:
                     raise JanusCloudError('No such mid \'{}\' in feed ({})'.format(mid, feed),
                                         JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
-            else:
-                # subscribe all streams of the publisher
-                if publisher.data_stream:
-                    new_data_feed_ids.add(feed)
 
         # join the backend room as a subscriber
         body = {
@@ -810,14 +800,9 @@ class VideoRoomSubscriber(object):
             if self.sdp:
                 self._wait_sdp_answer = True 
 
-        self._data_feed_ids.update(new_data_feed_ids)
-
         if 'streams' in reply_data:
             self._update_streams(reply_data['streams']) 
-            # because _update_streams already call _sync_feeds(), no need to call _sync_feed again
-            # self._sync_feeds()
-        else:
-            self._sync_feeds()          
+       
 
         return reply_data.get('videoroom',''), reply_jsep
 
@@ -838,33 +823,18 @@ class VideoRoomSubscriber(object):
             raise JanusCloudError('Empty unsubscription list',
                                   JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
 
-        del_data_feed_ids = set()
         for stream in streams:
             sub_mid = stream.get('sub_mid', '')
             if sub_mid:
                 ss = self.streams_bymid.get(sub_mid)
                 if ss is None:
                     log.warning('Subscriber stream with mid \'{}\' not found, not unsubscribing...'.format(sub_mid))
-                else:
-                    # unsubscribe all publisher streams on this subscriber stream
-                    if ss.type == 'data':
-                        del_data_feed_ids.update(self._data_feed_ids)
+
             else:
                 feed = stream.get('feed', 0)
                 publisher = room.get_participant_by_user_id(feed)
                 if publisher is None or not publisher.webrtc_started:
                     log.warning('Publisher \'{}\' not found, not unsubscribing...'.format(feed))
-                else:
-                    mid = stream.get('mid', '')
-                    if mid:
-                        # unsubscribe one publisher stream on all subscriber streams
-                        ps = publisher.streams_bymid.get(mid)
-                        if ps is not None and ps.type == 'data':
-                            del_data_feed_ids.add(feed)
-                    else:
-                        # unsubscrie all streams of this publisher all subscriber streams
-                        if publisher.data_stream:
-                            del_data_feed_ids.add(feed)
 
                 if publisher is not None and 'mid' in stream :
                     # change mid to backend mid if needed
@@ -886,14 +856,103 @@ class VideoRoomSubscriber(object):
             if self.sdp:
                 self._wait_sdp_answer = True  
 
-        self._data_feed_ids.difference_update(del_data_feed_ids)
+        if 'streams' in reply_data:
+            self._update_streams(reply_data['streams'])  
+
+        return reply_data.get('videoroom', ''), reply_jsep
+
+
+
+    def update(self, subscribe=None, unsubscribe=None):
+        self._assert_valid()
+
+        if self._backend_handle is None:
+            raise JanusCloudError('backend handle invalid',
+                                  JANUS_VIDEOROOM_ERROR_JOIN_FIRST) 
+
+        room = self.room_wref()
+        if room is None:
+            raise JanusCloudError('No such room ({})'.format(self.room_id),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)
+
+        if subscribe is None and unsubscribe is None:
+            raise JanusCloudError("At least one of either 'subscribe' or 'unsubscribe' must be present",
+                                  JANUS_VIDEOROOM_ERROR_MISSING_ELEMENT)            
+
+        if subscribe is not None:
+            # Adding new subscriber streams
+            if len(subscribe) == 0:
+                # streams is empty
+                raise JanusCloudError('Empty subscription list',
+                                    JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)  
+            for stream in subscribe:
+                feed = stream.get('feed', 0)
+                publisher = room.get_participant_by_user_id(feed)
+                if publisher is None or not publisher.webrtc_started:
+                    raise JanusCloudError('No such feed ({})'.format(feed),
+                                        JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
+
+                if feed not in self._feeds:
+                    raise JanusCloudError("Can only subcribe one feed in non-cascade mode",
+                                        JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
+
+                mid = stream.get('mid', '')  
+                if mid:
+                    # only subscribe one stream
+                    if mid in publisher.streams_bymid:
+                        ps = publisher.streams_bymid[mid]
+                        # change mid to backend mid if needed
+                        if self._is_cascade(publisher=publisher):
+                            stream['mid'] = '{}'.format(ps.mindex)                       
+                    else:
+                        raise JanusCloudError('No such mid \'{}\' in feed ({})'.format(mid, feed),
+                                            JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+        if unsubscribe is not None:
+            # Removing subscriber streams
+            if len(unsubscribe) == 0:
+                # streams is empty
+                raise JanusCloudError('Empty unsubscription list',
+                                      JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+            for stream in unsubscribe:
+                sub_mid = stream.get('sub_mid', '')
+                if sub_mid:
+                    ss = self.streams_bymid.get(sub_mid)
+                    if ss is None:
+                        log.warning('Subscriber stream with mid \'{}\' not found, not unsubscribing...'.format(sub_mid))
+                else:
+                    feed = stream.get('feed', 0)
+                    publisher = room.get_participant_by_user_id(feed)
+                    if publisher is None or not publisher.webrtc_started:
+                        log.warning('Publisher \'{}\' not found, not unsubscribing...'.format(feed))
+
+                    if publisher is not None and 'mid' in stream :
+                        # change mid to backend mid if needed
+                        if self._is_cascade(publisher):
+                            ps = publisher.streams_bymid.get(stream['mid'])
+                            if ps is not None:
+                                stream['mid'] = '{}'.format(ps.mindex) 
+
+
+
+        # join the backend room as a subscriber
+        body = {
+            'request': 'update',
+        }
+        if subscribe is not None:
+            body['subscribe'] = subscribe
+        if unsubscribe is not None:
+            body['unsubscribe'] = unsubscribe
+
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body)
+
+        if reply_jsep:
+            self.sdp = reply_jsep.get('sdp', '')
+            if self.sdp:
+                self._wait_sdp_answer = True  
 
         if 'streams' in reply_data:
             self._update_streams(reply_data['streams'])  
-            # because _update_streams already call _sync_feeds(), no need to call _sync_feed again
-            # self._sync_feeds()
-        else:
-            self._sync_feeds()
 
         return reply_data.get('videoroom', ''), reply_jsep
 
@@ -2607,6 +2666,7 @@ class VideoRoom(object):
                         pl['audio_codec'] = stream.codec
                 elif stream.type == 'video':
                     info['codec'] = stream.codec
+                    
                     if not video_added:
                         video_added = True
                         pl['video_codec'] = stream.codec
@@ -3658,7 +3718,19 @@ class VideoRoomHandle(FrontendHandleBase):
                     }
                     if reply_jsep:
                         reply_event['streams'] = subscriber.streams_info()
+                elif request == 'update':
+                    log.debug('Adding new subscriber streams')
+                    log.debug('Removing subscriber streams')
 
+                    update_params = subscriber_update_schema.validate(body)
+                    update_result, reply_jsep = subscriber.update(**update_params)
+
+                    reply_event = {
+                        'videoroom': update_result,
+                        'room': subscriber.room_id,
+                    }
+                    if reply_jsep:
+                        reply_event['streams'] = subscriber.streams_info()
 
                 else:
                     raise JanusCloudError('Unknown request \'{}\''.format(request),
