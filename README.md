@@ -77,9 +77,9 @@ Its APIs is compatible with the videocall plugin of Janus-gateway util v1.0.2(20
 
 This is a plugin implementing a videoconferencing SFU, just like videoroom plugin of the Janus server. It tries to keep almost the same API with the videoroom plugin of Janus server, and scale it out by distributing different publishers to different backend Janus server, so that Janus-proxy can support more publishers in one videoconferencing room than single Janus server. Contrast to the videoroom plugin of Janus server, there are some limitations below on this plugin to simplify the code.
 
-- audiolevel_event not support
 - subscriber switch not support
 - string_ids not support
+- dummy publishers not support
 
 The videoroom plugin of Janus-gateway has refactored with the new multistream API primitive since v1.0.0, so this plugin also need to refactored to support it.
 The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.0.2(2022-05-23). 
