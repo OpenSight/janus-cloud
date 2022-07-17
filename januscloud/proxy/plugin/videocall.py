@@ -38,7 +38,7 @@ JANUS_VIDEOCALL_ERROR_USE_ECHO_TEST = 479
 JANUS_VIDEOCALL_ERROR_NO_CALL = 481
 JANUS_VIDEOCALL_ERROR_MISSING_SDP = 482
 
-JANUS_VIDEOCALL_API_SYNC_VERSION = 'v0.11.4(2021-09-7)'
+JANUS_VIDEOCALL_API_SYNC_VERSION = 'v1.0.3(2022-06-20)'
 
 JANUS_VIDEOCALL_VERSION = 6
 JANUS_VIDEOCALL_VERSION_STRING = '0.0.6'
@@ -135,20 +135,20 @@ class VideoCallHandle(FrontendHandleBase):
             backend_handle.detach()
 
     def handle_hangup(self):
-        log.debug('handle_hangup for videocall Handle {}'.format(self.handle_id))
+        # log.debug('handle_hangup for videocall Handle {}'.format(self.handle_id))
         if self.backend_handle:
             self.backend_handle.send_hangup()
 
     def handle_message(self, transaction, body, jsep=None):
-        log.debug('handle_message for videocall handle {}. transaction:{} body:{} jsep:{}'.
-                 format(self.handle_id, transaction, body, jsep))
+        # log.debug('handle_message for videocall handle {}. transaction:{} body:{} jsep:{}'.
+        #         format(self.handle_id, transaction, body, jsep))
 
         self._enqueue_async_message(transaction, body, jsep)
         return JANUS_PLUGIN_OK_WAIT, None
 
     def handle_trickle(self, candidate=None, candidates=None):
-        log.debug('handle_trickle for videocall handle {}.candidate:{} candidates:{}'.
-                  format(self.handle_id, candidate, candidates))
+        # log.debug('handle_trickle for videocall handle {}.candidate:{} candidates:{}'.
+        #          format(self.handle_id, candidate, candidates))
 
         if self.videocall_user is None or self.videocall_user.incall == False:
             if candidates:
@@ -156,9 +156,9 @@ class VideoCallHandle(FrontendHandleBase):
             if candidate:
                 self._pending_candidates.append(candidate)
         else:
-            while self.backend_handle is None and self.videocall_user.incall == True:
-                # backend handle is building
-                gevent.sleep(0.1)
+            # while self.backend_handle is None and self.videocall_user.incall == True:
+            #     # backend handle is building
+            #     gevent.sleep(0.1)
             if self.backend_handle:
                 self.backend_handle.send_trickle(candidate=candidate, candidates=candidates)
             else:
@@ -176,8 +176,9 @@ class VideoCallHandle(FrontendHandleBase):
         self.videocall_user.peer_name = caller_username
         self.videocall_user.utime = time.time()
         self._plugin.user_dao.update(self.videocall_user)
+        self._pending_candidates.clear()
         try:
-            self._connect_backend(backend_server_url)
+            self.backend_handle = self._connect_backend(backend_server_url)
         except Exception:
             self._disconnect_backend()
             self.videocall_user.peer_name = ''
@@ -264,13 +265,19 @@ class VideoCallHandle(FrontendHandleBase):
                     self.videocall_user.utime = time.time()
                     self._plugin.user_dao.update(self.videocall_user)
                     try:
-                        self._connect_backend(server.url)
+                        backend_handle = self._connect_backend(server.url)
                         self._plugin.call_peer(username, self.videocall_user.username,
                                                server.url)
                         # send call request to backend server
-                        result, reply_jsep = self._send_backend_meseage(self.backend_handle,body, jsep)
+                        result, reply_jsep = self._send_backend_meseage(backend_handle,body, jsep)
+
+                        self.backend_handle = backend_handle
+                        if len(self._pending_candidates) > 0:
+                            pending_candidates = self._pending_candidates.copy()
+                            self._pending_candidates.clear()
+                            backend_handle.send_trickle(pending_candidates)
+                            
                     except Exception:
-                        backend_handle = self.backend_handle
                         self.backend_handle = None
                         if backend_handle:
                             backend_handle.detach()
@@ -290,6 +297,10 @@ class VideoCallHandle(FrontendHandleBase):
 
                 # send accept request to backend server
                 result, reply_jsep = self._send_backend_meseage(self.backend_handle, body, jsep)
+
+
+
+
             elif request == 'set':
                 if self.backend_handle:  # has set up the backend handle
                     # send set request to backend server
@@ -317,6 +328,7 @@ class VideoCallHandle(FrontendHandleBase):
                     self.videocall_user.peer_name = ''
                     self.videocall_user.incall = False
                     self.videocall_user.utime = time.time()
+                    self._pending_candidates.clear()
                     self._plugin.user_dao.update(self.videocall_user)
 
                     if backend_handle:
@@ -330,7 +342,7 @@ class VideoCallHandle(FrontendHandleBase):
                     else:
                         log.warn('backend_handle absent for user {}'.format(self.videocall_user.username))
 
-                    log.debug("{} is hanging up the call with {}".format(
+                    log.info("{} is hanging up the call with {}".format(
                         self.videocall_user.username, peer_name)
                     )
                 else:
@@ -396,6 +408,7 @@ class VideoCallHandle(FrontendHandleBase):
                     self.videocall_user.peer_name = ''
                     self.videocall_user.incall = False
                     self.videocall_user.utime = time.time()
+                    self._pending_candidates.clear()
                     self._plugin.user_dao.update(self.videocall_user)
                     if backend_handle:
                         backend_handle.detach()
@@ -487,8 +500,6 @@ class VideoCallHandle(FrontendHandleBase):
             self._send_backend_meseage(backend_handle, body)
             if self._pending_set_body:
                 self._send_backend_meseage(backend_handle, self._pending_set_body)
-            if len(self._pending_candidates) > 0:
-                backend_handle.send_trickle(candidates=self._pending_candidates)
 
         except Exception:
             backend_handle.detach()
@@ -497,9 +508,8 @@ class VideoCallHandle(FrontendHandleBase):
         # connect & setup successfully
         if self._pending_set_body:
             self._pending_set_body = None
-        if len(self._pending_candidates) > 0:
-            self._pending_candidates.clear()
-        self.backend_handle = backend_handle
+
+        return backend_handle
 
     def _disconnect_backend(self):
         if self.backend_handle is not None:

@@ -48,15 +48,15 @@ class EchoTestHandle(FrontendHandleBase):
         if self.backend_handle is None:
             raise JanusCloudError('backend handle invalid', JANUS_ERROR_BAD_GATEWAY)
 
-        log.info('handle_hangup for echotest Handle {}'.format(self.handle_id))
+        # log.info('handle_hangup for echotest Handle {}'.format(self.handle_id))
         self.backend_handle.send_hangup()
 
     def handle_message(self, transaction, body, jsep=None):
         if self.backend_handle is None:
             raise JanusCloudError('backend handle invalid', JANUS_ERROR_BAD_GATEWAY)
 
-        log.debug('handle_message for echotest handle {}. transaction:{} body:{} jsep:{}'.
-                  format(self.handle_id, transaction, body, jsep))
+        # log.debug('handle_message for echotest handle {}. transaction:{} body:{} jsep:{}'.
+        #           format(self.handle_id, transaction, body, jsep))
 
         self._enqueue_async_message(transaction, body, jsep)
         return JANUS_PLUGIN_OK_WAIT, None
@@ -64,8 +64,8 @@ class EchoTestHandle(FrontendHandleBase):
     def handle_trickle(self, candidate=None, candidates=None):
         if self.backend_handle is None:
             raise JanusCloudError('backend handle invalid', JANUS_ERROR_BAD_GATEWAY)
-        log.debug('handle_trickle for echotest handle {}.candidate:{} candidates:{}'.
-                 format(self.handle_id, candidate, candidates))
+        # log.debug('handle_trickle for echotest handle {}.candidate:{} candidates:{}'.
+        #          format(self.handle_id, candidate, candidates))
         self.backend_handle.send_trickle(candidate=candidate, candidates=candidates)
 
     def _handle_async_message(self, transaction, body, jsep):

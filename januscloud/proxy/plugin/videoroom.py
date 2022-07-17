@@ -24,6 +24,7 @@ from januscloud.proxy.rest.common import post_view, get_params_from_request, get
 from pyramid.response import Response
 import sys
 import traceback
+import weakref
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.12.0(2022-03-03)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v1.0.3(2022-06-20)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -146,15 +147,31 @@ kick_schema = Schema({
 })
 
 moderate_schema = Schema({
-    Optional('mute_audio'): BoolVal(),
-    Optional('mute_video'): BoolVal(),
-    Optional('mute_data'): BoolVal(),
+    Optional('mid'): StrVal(max_len=32),
+    Optional('mute'): BoolVal(),
     AutoDel(str): object  # for all other key we must delete
 })
-
+rtp_forward_stream_schema = Schema({
+    Optional('mid'): StrVal(max_len=32),
+    Optional('host'): StrVal(max_len=256),
+    Optional('host_family'): EnumVal(['ipv4', 'ipv6']),
+    Optional('port'): IntVal(min=0, max=65535),
+    Optional('ssrc'): IntVal(min=0),
+    Optional('pt'): IntVal(min=0),
+    Optional('rtcp_port'): IntVal(min=0, max=65535),
+    Optional('simulcast'): BoolVal(),
+    Optional('port_2'): IntVal(min=0, max=65535),
+    Optional('ssrc_2'): IntVal(min=0),
+    Optional('pt_2'): IntVal(min=0),
+    Optional('port_3'): IntVal(min=0, max=65535),
+    Optional('ssrc_3'): IntVal(min=0),
+    Optional('pt_3'): IntVal(min=0),
+    AutoDel(str): object  # for all other key we must delete 
+})
 rtp_forward_schema = Schema({
     'host': StrVal(max_len=256),
     Optional('host_family'): EnumVal(['ipv4', 'ipv6']),
+    Optional('streams'): ListVal(rtp_forward_stream_schema),
     Optional('audio_port'): IntVal(min=0, max=65535),
     Optional('audio_ssrc'): IntVal(min=0),
     Optional('audio_pt'): IntVal(min=0),
@@ -199,10 +216,30 @@ publisher_join_schema = Schema({
     AutoDel(str): object  # for all other key we must delete
 })
 
+publisher_description_schema = Schema({
+    'mid': StrVal(max_len=32),
+    'description': StrVal(max_len=256),
+    AutoDel(str): object  # for all other key we must delete
+})
+
+publisher_configure_stream_schema = Schema({
+    'mid': StrVal(max_len=32),
+    Optional('send'): BoolVal(),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(), 
+    AutoDel(str): object  # for all other key we must delete
+})
+
 publisher_configure_schema = Schema({
+    # Deprecated, use mid+send instead
     Optional('audio'): BoolVal(),
     Optional('video'): BoolVal(),
     Optional('data'): BoolVal(),
+    # Only needed when configuring, to make a stream active/inactive
+    Optional('mid'): StrVal(max_len=32),
+    Optional('send'): BoolVal(),
+
     Optional('audiocodec'): StrVal(max_len=256),
     Optional('videocodec'): StrVal(max_len=256),
     Optional('bitrate'): IntVal(min=0),
@@ -211,19 +248,20 @@ publisher_configure_schema = Schema({
     Optional('filename'): StrVal(max_len=256),
     Optional('secret'): StrVal(max_len=256),
     Optional('display'): StrVal(max_len=256),
+
     Optional('update'): BoolVal(),
+
     Optional('audio_active_packets'): IntVal(min=1),
     Optional('audio_level_average'): IntVal(min=1, max=127),
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
+    Optional('streams'): ListVal(publisher_configure_stream_schema),  
+    Optional('descriptions'): ListVal(publisher_description_schema),     
     AutoDel(str): object  # for all other key we must delete
 })
 
 publisher_publish_schema = Schema({
-    Optional('audio'): BoolVal(),
-    Optional('video'): BoolVal(),
-    Optional('data'): BoolVal(),
     Optional('audiocodec'): StrVal(max_len=256),
     Optional('videocodec'): StrVal(max_len=256),
     Optional('bitrate'): IntVal(min=0),
@@ -233,14 +271,34 @@ publisher_publish_schema = Schema({
     Optional('display'): StrVal(max_len=256),
     Optional('audio_active_packets'): IntVal(min=1),
     Optional('audio_level_average'): IntVal(min=1, max=127),
+    Optional('descriptions'): ListVal(publisher_description_schema),   
+    AutoDel(str): object  # for all other key we must delete
+})
+
+
+subscriber_stream_schema = Schema({
+    'feed': IntVal(min=1),
+    Optional('mid'): StrVal(max_len=32),
+    Optional('substream'): IntVal(min=0, max=2),
+    Optional('temporal'): IntVal(min=0, max=2),
+    Optional('fallback'): IntVal(min=0),
+    Optional('spatial_layer'): IntVal(min=0, max=2),
+    Optional('temporal_layer'): IntVal(min=0, max=2),
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
     AutoDel(str): object  # for all other key we must delete
 })
 
+subscriber_del_stream_schema = Schema({
+    Optional('feed'): IntVal(min=1),
+    Optional('mid'): StrVal(max_len=32),
+    Optional('sub_mid'): StrVal(max_len=32),
+    AutoDel(str): object  # for all other key we must delete
+})
+
 subscriber_join_schema = Schema({
-    'feed': IntVal(min=1),
+    Optional('feed'): IntVal(min=1),
     Optional('private_id'): IntVal(min=1),
     Optional('close_pc'): BoolVal(),
     Optional('audio'): BoolVal(),
@@ -257,23 +315,67 @@ subscriber_join_schema = Schema({
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
+    Optional('streams'): ListVal(subscriber_stream_schema),     
     AutoDel(str): object  # for all other key we must delete
 })
 
+subscriber_subscribe_schema = Schema({
+    'streams': ListVal(subscriber_stream_schema),  
+    AutoDel(str): object  # for all other key we must delete
+})
+
+subscriber_unsubscribe_schema = Schema({
+    'streams': ListVal(subscriber_del_stream_schema),  
+    AutoDel(str): object  # for all other key we must delete
+})
+
+subscriber_update_schema = Schema({
+    Optional('subscribe'): ListVal(subscriber_stream_schema), 
+    Optional('unsubscribe'): ListVal(subscriber_del_stream_schema),  
+    AutoDel(str): object  # for all other key we must delete
+})
+
+subscriber_configure_stream_schema = Schema({
+    'mid': StrVal(max_len=32),
+    Optional('send'): BoolVal(),
+    # For VP8 (or H.264) simulcast 
+    Optional('substream'): IntVal(min=0, max=2),
+    Optional('temporal'): IntVal(min=0, max=2),
+    Optional('fallback'): IntVal(min=0),  
+
+    # For VP9 SVC
+    Optional('spatial_layer'): IntVal(min=0, max=2),
+    Optional('temporal_layer'): IntVal(min=0, max=2),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(),   
+
+})
+
 subscriber_configure_schema = Schema({
+
+    Optional('mid'): StrVal(max_len=32),
+    Optional('send'): BoolVal(),
+    #  Deprecated properties, use mid+send instead 
     Optional('audio'): BoolVal(),
     Optional('video'): BoolVal(),
     Optional('data'): BoolVal(),
+    # used for sdp renegotiation and ICE restart
     Optional('update'): BoolVal(),
     Optional('restart'): BoolVal(),
+    # For VP8 (or H.264) simulcast 
     Optional('substream'): IntVal(min=0, max=2),
     Optional('temporal'): IntVal(min=0, max=2),
     Optional('fallback'): IntVal(min=0),
+    # For VP9 SVC
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
+
+    Optional('streams'): ListVal(subscriber_configure_stream_schema),  
+
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -296,35 +398,76 @@ def _send_backend_message(backend_handle, body, jsep=None):
     return data, reply_jsep
 
 
+
+class SubscriberStream(object):
+    def __init__(self, mindex: int, type: str, mid: str, 
+                 active=False, ready=False, send=False,
+                 sources=0, source_ids=[],
+                 feed_id=0, feed_display='', feed_mid='',
+                 feed_description='',
+                 codec='', 
+                 h264_profile='', vp9_profile='',
+                 playout_delay={},
+                 simulcast={},
+                 svc={}):
+        self.mindex = mindex
+        self.type = type
+        self.mid = mid
+        self.active = active
+        self.ready = ready
+        self.send = send
+        self.sources = sources
+        self.source_ids = source_ids
+        self.feed_id = feed_id
+        self.feed_display = feed_display
+        self.feed_mid = feed_mid
+        self.feed_description = feed_description
+        self.codec = codec
+        self.h264_profile = h264_profile
+        self.vp9_profile = vp9_profile
+        self.playout_delay = playout_delay
+        self.simulcast = simulcast
+        self.svc = svc
+
 class VideoRoomSubscriber(object):
 
-    def __init__(self, handle, pvt_id=0, owner=None, room_id=0):
+    def __init__(self, handle, owner=None):
 
-        self.room_id = room_id   # Unique room ID
-        self.pvt_id = pvt_id     # Private ID of the participant that is subscribing (if available/provided)
+        self.room_id = 0
+        self.room_wref = None
+
         self._frontend_handle = handle
 
         self.webrtc_started = False  # webrtc peerconnection is up or not
 
-        self._feed = None         # Participant this subscriber is subscribed to
-        self._feed_id = 0
+        self.streams = []
+        self.streams_bymid = {}
+
+        self._feeds = {}               # Participant this subscriber is subscribed to
+        self._data_feed_ids = set()
+        self._media_feed_ids = set()
+
         self._owner = owner        # Participant who owns this subscriber
+        self._owner_id = owner.user_id if owner else 0
 
         self._kicked = False      #  Whether this subscription belongs to a participant that has been kicked
         self._paused = False
 
         self._has_destroyed = False
 
+        self._wait_sdp_answer = False
+
         self.sdp = ''  # Offer we sent this listener (may be updated within renegotiations)
 
         self._backend_handle = None
+        self._backend_room = None
 
         self.utime = time.time()
         self.ctime = time.time()
 
     def __str__(self):
-        return 'Video Room Subscriber (feed_id:{}, pvt_id:{})'.format(
-            self._feed_id, self.pvt_id)
+        return 'Video Room Subscriber (room_id:{}, owner_id:{})'.format(
+            self.room_id, self._owner_id)
 
     def destroy(self):
 
@@ -332,17 +475,28 @@ class VideoRoomSubscriber(object):
             return
         self._has_destroyed = True
 
+        self.streams.clear()
+        self.streams_bymid.clear()
+
+        if self.room_wref:
+            self.room_id = 0
+            self.room_wref = None
+
+        self._backend_room = None
+
+        self._wait_sdp_answer = False
+
         if self._owner:
             # remove from room
             publisher = self._owner
             self._owner = None
             publisher.del_subscription(self)
 
-        if self._feed:
-            publisher = self._feed
-            self._feed = None
-            self._feed_id = 0
+        for publisher in self._feeds.values():
             publisher.del_subscriber(self)
+        self._feeds.clear()
+        self._data_feed_ids.clear()
+        self._media_feed_ids.clear()
 
         if self._backend_handle:
             backend_handle = self._backend_handle
@@ -361,67 +515,526 @@ class VideoRoomSubscriber(object):
 
     def _assert_valid(self):
         if self._has_destroyed:
-            raise JanusCloudError('Subscriber already destroyed (feed: {}, room_id: {})'.format(self._feed_id,
-                                                                                                  self.room_id),
-                                  JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED)
+            raise JanusCloudError('Subscriber already destroyed (room_id: {}, owner_id: {})'.format(
+                self.room_id, self._owner_id),
+                JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED)
 
-    def subscribe(self, publisher,
-                  close_pc=True,
-                  audio=True, video=True, data=True,
-                  offer_audio=True, offer_video=True, offer_data=True,
-                  substream=-1, temporal=-1,
-                  fallback=-1,
-                  spatial_layer=-1, temporal_layer=-1,
-                  min_delay=-1, max_delay=-1,
-                  **kwargs):
+    def _is_cascade(self, publisher, self_backend_room=None):
+        
+        if self_backend_room is None:
+            self_backend_room = self._backend_room
+        if self_backend_room is None:
+            return False                                 
+        publisher_backend_room = publisher.get_backend_room()
+        if publisher_backend_room is None:
+            return False
+        if publisher_backend_room.server_name == self_backend_room.server_name:
+            return False
+        return True
+
+    def _sync_feeds(self):
+
+        room = self.room_wref()
+        if room is None:
+            return # room is destroyed, no need to sync feeds
+
+        cur_feed_ids = self._data_feed_ids |  self._media_feed_ids
+        old_feed_ids = set(self._feeds.keys())
+        if cur_feed_ids == old_feed_ids:
+            return # already sync
+        del_feed_ids = old_feed_ids - cur_feed_ids
+        add_feed_ids = cur_feed_ids - old_feed_ids
+
+        for user_id in del_feed_ids:
+            publisher = self._feeds.pop(user_id, None)
+            if publisher:
+                publisher.del_subscriber(self)
+        
+        for user_id in add_feed_ids:
+            publisher = room.get_participant_by_user_id(user_id)
+            if publisher:
+                publisher.add_subscriber(self)
+                self._feeds[user_id] = publisher
+
+    def _update_streams(self, streams_info):
+
+        self.streams.clear()
+        self.streams_bymid.clear()
+        room = self.room_wref()
+        self._media_feed_ids.clear()
+        self._data_feed_ids.clear()
+        
+        for index, stream_info in enumerate(streams_info):
+            stream_info = dict(stream_info)
+            mindex = stream_info.pop('mindex', index)
+            # change '-' to '_'
+            if 'h264-profile' in stream_info:
+                stream_info['h264_profile'] = stream_info.pop('h264-profile')
+            if 'vp9-profile' in stream_info:
+                stream_info['vp9_profile'] = stream_info.pop('vp9-profile')
+            if 'playout-delay' in stream_info:
+                stream_info['playout_delay'] = stream_info.pop('playout-delay')
+ 
+            stream = SubscriberStream(mindex=mindex, **stream_info)
+            self.streams.append(stream)
+            self.streams_bymid[stream.mid] = stream
+            
+            if stream.type == 'data':
+                # data stream
+                if stream.source_ids:
+                    self._data_feed_ids.update(stream.source_ids)
+            else:
+                # media stream
+                self._media_feed_ids.add(stream.feed_id)
+                # update the feed info according to janus-proxy
+                if stream.feed_id and room is not None and room.user_id_exists(stream.feed_id):
+                    # update the feed info 
+                    publisher = room.get_participant_by_user_id(stream.feed_id)
+                    stream.feed_display = publisher.display
+                    if stream.feed_mid:
+                        if self._is_cascade(publisher):
+                            feed_index = int(stream.feed_mid)
+                            if feed_index < len(publisher.streams):
+                                ps = publisher.streams[feed_index]
+                                stream.feed_mid = ps.mid
+                                stream.feed_description = ps.description
+                        else:
+                            ps = publisher.streams_bymid.get(stream.feed_mid)
+                            if ps:
+                                stream.feed_description = ps.description
+
+        # sync *_feed_ids to _feeds
+        self._sync_feeds()
+
+    def streams_info(self):
+        media = []
+        for stream in self.streams:
+            info = {
+                'type': stream.type,
+                'mindex': stream.mindex,
+                'mid': stream.mid,
+                'active': stream.active,
+                'ready': stream.ready,
+                'send': stream.send
+            }
+            if stream.type == 'data':
+                if stream.sources:
+                    info['sources'] = stream.sources
+                if stream.source_ids:
+                    info['source_ids'] = stream.source_ids
+            else:
+                if stream.feed_id:
+                    info['feed_id'] = stream.feed_id
+                if stream.feed_display:
+                    info['feed_display'] = stream.feed_display
+                if stream.feed_mid:
+                    info['feed_mid'] = stream.feed_mid
+                if stream.feed_description:
+                    info['feed_description'] = stream.feed_description
+                info['codec'] = stream.codec
+                if stream.type == 'video':
+                    if stream.codec == 'h264' and stream.h264_profile:
+                        info['h264-profile'] = stream.h264_profile
+                    elif stream.codec == 'vp9'and stream.vp9_profile:
+                        info['vp9-profile'] = stream.vp9_profile
+                    if stream.playout_delay:
+                        info['playout-delay'] = stream.playout_delay
+                if stream.simulcast:
+                    info['simulcast'] = stream.simulcast
+                if stream.svc:
+                    info['svc'] = stream.svc
+            media.append(info)
+
+        return media
+                
+    def join(self, room, streams=[], feed=0, **kwargs):
+
         self._assert_valid()
+
+        if self.room_wref is not None:
+            raise JanusCloudError('Already in as a subscriber on this handle',
+                                  JANUS_VIDEOROOM_ERROR_ALREADY_JOINED)
+        
         if self._backend_handle is not None:
-            raise JanusCloudError('Already subscribe',
+            raise JanusCloudError('Already join',
                                   JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND)
-        if publisher.sdp == '':
-            raise JanusCloudError('No such feed ({})'.format(publisher.user_id),
-                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+        
+        publishers = []
+        if streams:
+            # for new multi-stream API check all stream's feed
+            feed_ids = set()
+            for stream in streams:
+                feed = stream.get('feed', 0)
+                publisher = room.get_participant_by_user_id(feed)
+                if publisher is None or not publisher.webrtc_started:
+                    raise JanusCloudError('No such feed ({})'.format(feed),
+                                        JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
+                mid = stream.get('mid', '')  
+                if mid:
+                    if mid not in publisher.streams_bymid:
+                        raise JanusCloudError('No such mid \'{}\' in feed ({})'.format(mid, feed),
+                                        JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
+                
 
-        if (not audio or not offer_audio) and \
-                (not video or not offer_video) and \
-                (not data or not offer_data):
-            raise JanusCloudError('Can\'t offer an SDP with no audio, video or data',
-                                  JANUS_VIDEOROOM_ERROR_INVALID_SDP)
 
+                if publisher.streams and feed not in feed_ids:
+                    feed_ids.add(feed)
+                    publishers.append(publisher)
+
+        elif feed:
+            # for deprecated API, check the feed            
+            publisher = room.get_participant_by_user_id(feed)
+            if publisher is None or not publisher.webrtc_started:
+                raise JanusCloudError('No such feed ({})'.format(feed),
+                                        JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+            
+            do_data = kwargs.get('offer_data', True)
+            do_video = kwargs.get('offer_video', True)
+            do_audio = kwargs.get('offer_audio', True)
+            stream_num = 0
+            for ps in publisher.streams:
+                if ps.type == 'data' and do_data: 
+                    stream_num += 1
+                elif ps.type == 'video' and do_video:
+                    stream_num += 1
+                elif ps.type == 'audio' and do_audio:
+                    stream_num += 1
+            if stream_num:
+                publishers.append(publisher)
+        else:
+            raise JanusCloudError("At least one between 'streams' and 'feed' must be specified",
+                                  JANUS_VIDEOROOM_ERROR_MISSING_ELEMENT)            
+
+        if not publishers:
+            # not found any feeds
+            raise JanusCloudError("Can't offer an SDP with no stream",
+                                  JANUS_VIDEOROOM_ERROR_INVALID_SDP)            
+        if len(publishers) > 1:
+            raise JanusCloudError("Can only subcribe one feed in non-cascade mode",
+                                  JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
+
+        # for non-cascade mode
+        publisher = publishers[0]
         backend_room = publisher.get_backend_room()
+
         if backend_room is None:
             raise JanusCloudError('No such feed ({})'.format(publisher.user_id),
                                   JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
 
+        # change mid to the backend mid
+        for stream in streams:
+            publisher = room.get_participant_by_user_id(stream.get('feed', 0))  
+            if publisher:
+                mid = stream.get('mid', '')  
+                if mid and mid in publisher.streams_bymid:
+                    if self._is_cascade(publisher=publisher, self_backend_room=backend_room):
+                        ps = publisher.streams_bymid[mid]
+                        stream['mid'] = '{}'.format(ps.mindex)
+
         # backend session
         backend_session = get_backend_session(backend_room.server_url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
-
         # attach backend handle
         backend_handle = backend_session.attach_handle(JANUS_VIDEOROOM_PACKAGE, handle_listener=self)
-
         try:
-            self._backend_handle = backend_handle
-
-            # add to publisher's subscribers
-            self._feed = publisher
-            self._feed_id = publisher.user_id
-            publisher.add_subscriber(self)
-
             # join the backend room as a subscriber
             body = {
                 'request':  'join',
                 'ptype': 'subscriber',
                 'room': backend_room.backend_room_id,
-                'feed': publisher.user_id,
-                'close_pc': close_pc,
-                'audio': audio,
-                'video': video,
-                'data': data,
-                'offer_audio': offer_audio,
-                'offer_video': offer_video,
-                'offer_data': offer_data
             }
+            if feed:
+                body['feed'] = feed
+            if streams:
+                body['streams'] = streams
+  
+            if len(kwargs) > 0:
+                for k, v in kwargs.items():
+                    if k not in body:
+                        body[k] = v
+
+            reply_data, reply_jsep = _send_backend_message(backend_handle, body)
+
+            self._backend_handle = backend_handle
+            self._backend_room = backend_room
+            self.room_wref = weakref.ref(room)
+            self.room_id = room.room_id
+
+            if reply_jsep:
+                self.sdp = reply_jsep.get('sdp', '')
+                if self.sdp:
+                    self._wait_sdp_answer = True  
+
+            if 'streams' in reply_data:
+                self._update_streams(reply_data['streams'])   
+
+            return reply_jsep
+
+        except Exception:
+            backend_handle.detach()
+            self._backend_handle = None
+            self._backend_room = None
+            self.room_wref = None
+            self.room_id = 0
+            raise
+
+    def subscribe(self, streams=[]):
+
+        self._assert_valid()
+        if self._backend_handle is None:
+            raise JanusCloudError('backend handle invalid',
+                                  JANUS_VIDEOROOM_ERROR_JOIN_FIRST) 
+        room = self.room_wref() 
+        if room is None:
+            raise JanusCloudError('No such room ({})'.format(self.room_id),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)
+        if not streams:
+            # streams is empty
+            raise JanusCloudError('Empty subscription list',
+                                  JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+
+        for stream in streams:
+            feed = stream.get('feed', 0)
+            publisher = room.get_participant_by_user_id(feed)
+            if publisher is None or not publisher.webrtc_started:
+                raise JanusCloudError('No such feed ({})'.format(feed),
+                                    JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
+
+            if feed not in self._feeds:
+                raise JanusCloudError("Can only subcribe one feed in non-cascade mode",
+                                    JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
+
+            mid = stream.get('mid', '')  
+            if mid:
+                # only subscribe one stream
+                if mid in publisher.streams_bymid:
+                    ps = publisher.streams_bymid[mid]
+                    # change mid to backend mid if needed
+                    if self._is_cascade(publisher=publisher):
+                        stream['mid'] = '{}'.format(ps.mindex)                       
+                else:
+                    raise JanusCloudError('No such mid \'{}\' in feed ({})'.format(mid, feed),
+                                        JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+        # join the backend room as a subscriber
+        body = {
+            'request': 'subscribe',
+            'streams': streams
+        }
+
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body)
+
+        if reply_jsep:
+            self.sdp = reply_jsep.get('sdp', '')
+            if self.sdp:
+                self._wait_sdp_answer = True 
+
+        if 'streams' in reply_data:
+            self._update_streams(reply_data['streams']) 
+       
+
+        return reply_data.get('videoroom',''), reply_jsep
+
+    def unsubscribe(self, streams=[]):
+        self._assert_valid()
+
+        if self._backend_handle is None:
+            raise JanusCloudError('backend handle invalid',
+                                  JANUS_VIDEOROOM_ERROR_JOIN_FIRST) 
+
+        room = self.room_wref()
+        if room is None:
+            raise JanusCloudError('No such room ({})'.format(self.room_id),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)
+
+        if not streams:
+            # streams is empty
+            raise JanusCloudError('Empty unsubscription list',
+                                  JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+
+        for stream in streams:
+            sub_mid = stream.get('sub_mid', '')
+            if sub_mid:
+                ss = self.streams_bymid.get(sub_mid)
+                if ss is None:
+                    log.warning('Subscriber stream with mid \'{}\' not found, not unsubscribing...'.format(sub_mid))
+
+            else:
+                feed = stream.get('feed', 0)
+                publisher = room.get_participant_by_user_id(feed)
+                if publisher is None or not publisher.webrtc_started:
+                    log.warning('Publisher \'{}\' not found, not unsubscribing...'.format(feed))
+
+                if publisher is not None and 'mid' in stream :
+                    # change mid to backend mid if needed
+                    if self._is_cascade(publisher):
+                        ps = publisher.streams_bymid.get(stream['mid'])
+                        if ps is not None:
+                            stream['mid'] = '{}'.format(ps.mindex) 
+
+        # join the backend room as a subscriber
+        body = {
+            'request': 'unsubscribe',
+            'streams': streams
+        }
+
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body)
+
+        if reply_jsep:
+            self.sdp = reply_jsep.get('sdp', '')
+            if self.sdp:
+                self._wait_sdp_answer = True  
+
+        if 'streams' in reply_data:
+            self._update_streams(reply_data['streams'])  
+
+        return reply_data.get('videoroom', ''), reply_jsep
+
+
+
+    def update(self, subscribe=None, unsubscribe=None):
+        self._assert_valid()
+
+        if self._backend_handle is None:
+            raise JanusCloudError('backend handle invalid',
+                                  JANUS_VIDEOROOM_ERROR_JOIN_FIRST) 
+
+        room = self.room_wref()
+        if room is None:
+            raise JanusCloudError('No such room ({})'.format(self.room_id),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)
+
+        if subscribe is None and unsubscribe is None:
+            raise JanusCloudError("At least one of either 'subscribe' or 'unsubscribe' must be present",
+                                  JANUS_VIDEOROOM_ERROR_MISSING_ELEMENT)            
+
+        if subscribe is not None:
+            # Adding new subscriber streams
+            if len(subscribe) == 0:
+                # streams is empty
+                raise JanusCloudError('Empty subscription list',
+                                    JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)  
+            for stream in subscribe:
+                feed = stream.get('feed', 0)
+                publisher = room.get_participant_by_user_id(feed)
+                if publisher is None or not publisher.webrtc_started:
+                    raise JanusCloudError('No such feed ({})'.format(feed),
+                                        JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED) 
+
+                if feed not in self._feeds:
+                    raise JanusCloudError("Can only subcribe one feed in non-cascade mode",
+                                        JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
+
+                mid = stream.get('mid', '')  
+                if mid:
+                    # only subscribe one stream
+                    if mid in publisher.streams_bymid:
+                        ps = publisher.streams_bymid[mid]
+                        # change mid to backend mid if needed
+                        if self._is_cascade(publisher=publisher):
+                            stream['mid'] = '{}'.format(ps.mindex)                       
+                    else:
+                        raise JanusCloudError('No such mid \'{}\' in feed ({})'.format(mid, feed),
+                                            JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
+
+        if unsubscribe is not None:
+            # Removing subscriber streams
+            if len(unsubscribe) == 0:
+                # streams is empty
+                raise JanusCloudError('Empty unsubscription list',
+                                      JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+            for stream in unsubscribe:
+                sub_mid = stream.get('sub_mid', '')
+                if sub_mid:
+                    ss = self.streams_bymid.get(sub_mid)
+                    if ss is None:
+                        log.warning('Subscriber stream with mid \'{}\' not found, not unsubscribing...'.format(sub_mid))
+                else:
+                    feed = stream.get('feed', 0)
+                    publisher = room.get_participant_by_user_id(feed)
+                    if publisher is None or not publisher.webrtc_started:
+                        log.warning('Publisher \'{}\' not found, not unsubscribing...'.format(feed))
+
+                    if publisher is not None and 'mid' in stream :
+                        # change mid to backend mid if needed
+                        if self._is_cascade(publisher):
+                            ps = publisher.streams_bymid.get(stream['mid'])
+                            if ps is not None:
+                                stream['mid'] = '{}'.format(ps.mindex) 
+
+
+
+        # join the backend room as a subscriber
+        body = {
+            'request': 'update',
+        }
+        if subscribe is not None:
+            body['subscribe'] = subscribe
+        if unsubscribe is not None:
+            body['unsubscribe'] = unsubscribe
+
+        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body)
+
+        if reply_jsep:
+            self.sdp = reply_jsep.get('sdp', '')
+            if self.sdp:
+                self._wait_sdp_answer = True  
+
+        if 'streams' in reply_data:
+            self._update_streams(reply_data['streams'])  
+
+        return reply_data.get('videoroom', ''), reply_jsep
+
+    def configure(self, mid='', send=None,
+                  audio=None, video=None, data=None,
+                  update=False, restart=False,
+                  substream=-1, temporal=-1, fallback=-1,
+                  spatial_layer=-1, temporal_layer=-1,
+                  min_delay=-1, max_delay=-1,
+                  streams=[],
+                  **kwargs):
+        self._assert_valid()
+        if self._kicked:
+            raise JanusCloudError('Unauthorized, you have been kicked',
+                                  JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
+
+        if self._backend_handle is None:
+            raise JanusCloudError('backend handle invalid',
+                                  JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
+        if update or restart:
+            # need renegotiate and will create a new offer
+            if self._wait_sdp_answer:
+                raise JanusCloudError('Still waiting for sdp answer',
+                                    JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)                
+        # check twhether the given mid exists
+        if streams:
+            for stream in streams:
+                if stream.get('mid', '') not in self.streams_bymid:
+                    raise JanusCloudError('No such mid \'{}\' in subscription'.format(mid),
+                                           JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)     
+        elif mid and mid not in self.streams_bymid:
+            raise JanusCloudError('No such mid \'{}\' in subscription'.format(mid),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)          
+
+        # backend configure
+        # send request to backend
+        body = {
+            'request': 'configure',
+        }
+        if update:
+            body['update'] = update,
+        if restart:
+            body['restart'] = restart
+        if streams:
+            body['streams'] = streams
+            audio = None
+            video = None
+            data = None
+        else:
+            if mid:
+                body['mid'] = mid
+            if send is not None:
+                body['send'] = bool(send)
             if substream >= 0:
                 body['substream'] = substream
             if temporal >= 0:
@@ -435,73 +1048,13 @@ class VideoRoomSubscriber(object):
             if min_delay >= 0:
                 body['min_delay'] = min_delay
             if max_delay >= 0:
-                body['max_delay'] = max_delay    
-
-            if len(kwargs) > 0:
-                for k, v in kwargs.items():
-                    if k not in body:
-                        body[k] = v
-
-            reply_data, reply_jsep = _send_backend_message(backend_handle, body)
-
-            if reply_jsep:
-                self.sdp = reply_jsep.get('sdp', '')
-
-            return reply_jsep
-        except Exception:
-            backend_handle.detach()
-            self._backend_handle = None
-            if self._feed:
-                publisher.del_subscriber(self)
-                self._feed = None
-                self._feed_id = 0
-            raise
-
-    def configure(self, audio=None, video=None, data=None,
-                  update=False, restart=False,
-                  substream=-1, temporal=-1,
-                  fallback=-1,
-                  spatial_layer=-1, temporal_layer=-1,
-                  min_delay=-1, max_delay=-1,
-                  **kwargs):
-        self._assert_valid()
-        if self._kicked:
-            raise JanusCloudError('Unauthorized, you have been kicked',
-                                  JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
-
-        if self._backend_handle is None:
-            raise JanusCloudError('backend handle invalid',
-                                  JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
-
-        # backend configure
-        # send request to backend
-        body = {
-            'request': 'configure',
-            'update': update,
-            'restart': restart,
-        }
-        if audio is not None:
-            body['audio'] = audio
-        if video is not None:
-            body['video'] = video
-        if data is not None:
-            body['data'] = data
-        if substream >= 0:
-            body['substream'] = substream
-        if temporal >= 0:
-            body['temporal'] = temporal
-        if fallback >= 0:
-            body['fallback'] = fallback
-        if spatial_layer >= 0:
-            body['spatial_layer'] = spatial_layer
-        if temporal_layer >= 0:
-            body['temporal_layer'] = temporal_layer
-
-        if min_delay >= 0:
-            body['min_delay'] = min_delay
-        if max_delay >= 0:
-            body['max_delay'] = max_delay     
-
+                body['max_delay'] = max_delay
+            if audio is not None:
+                body['audio'] = bool(audio)
+            if video is not None:
+                body['video'] = bool(video)
+            if data is not None:
+                body['data'] = bool(data)
 
         if len(kwargs) > 0:
             for k, v in kwargs.items():
@@ -513,6 +1066,8 @@ class VideoRoomSubscriber(object):
         # successful
         if reply_jsep:
             self.sdp = reply_jsep.get('sdp', '')
+            if self.sdp:
+                self._wait_sdp_answer = True  
 
         return reply_jsep
 
@@ -524,12 +1079,20 @@ class VideoRoomSubscriber(object):
         if self._backend_handle is None:
             raise JanusCloudError('backend handle invalid',
                                   JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
-        # backend start
-        _send_backend_message(self._backend_handle, body={
-            'request': 'start'
-        }, jsep=jsep)
 
-        self._paused = False
+        org_wait_sdp_answer = self._wait_sdp_answer
+
+        if jsep is not None:
+            self._wait_sdp_answer = False
+        
+        try:
+            # backend start
+            _send_backend_message(self._backend_handle, body={
+                'request': 'start'
+            }, jsep=jsep)
+            self._paused = False
+        except Exception:
+            self._wait_sdp_answer = org_wait_sdp_answer
 
     def pause(self):
 
@@ -545,9 +1108,14 @@ class VideoRoomSubscriber(object):
             return     # already kick
         self._kicked = True
         try:
-            self.pause()     # pause the backend relay
+            # pause the backend relay
+            if self._backend_handle:
+                self._backend_handle.async_send_message({
+                    'request': 'pause'
+                })
         except Exception:
-            log.exception('Subscriber for pvt_id({}) pause error for kicked'.format(self.pvt_id))
+            log.warning('Subscriber (room_id:{}, owner_id:{}) pause error for kicked'.format(
+                self.room_id, self._owner_id))
 
     def hangup(self):
         if self._has_destroyed:
@@ -573,15 +1141,33 @@ class VideoRoomSubscriber(object):
                 if self._frontend_handle:
                     self._frontend_handle.push_plugin_event(data, jsep)
             elif op == 'event':
-                reply_event = {}
-                for key, value in data.items():
-                    if key in ['substream', 'temporal', 'spatial_layer', 'temporal_layer', 'configured']:
-                        reply_event[key] = value
-                if len(reply_event) > 0:
+                if 'substream' in data or 'temporal' in data or \
+                    'spatial_layer' in data or 'temporal_layer' in data:
+                    reply_event = data.copy()
                     reply_event['videoroom'] = 'event'
-                    reply_event['room'] = self.room_id
+                    reply_event['room'] = self.room_id     
                     if self._frontend_handle:
-                        self._frontend_handle.push_plugin_event(reply_event, jsep)
+                        self._frontend_handle.push_plugin_event(reply_event, jsep)               
+                else:
+                    # ignore other event
+                    pass   
+            elif op == 'updated':
+                if jsep:
+                    self.sdp = jsep.get('sdp', '')
+                    if self.sdp:
+                        self._wait_sdp_answer = True  
+                if 'streams' in data:
+                    self._update_streams(data['streams'])
+
+                reply_event = {
+                    'videoroom': 'updated',
+                    'room': self.room_id
+                }
+                if 'streams' in data:
+                    reply_event['streams'] = self.streams_info()
+
+                if self._frontend_handle:
+                        self._frontend_handle.push_plugin_event(reply_event, jsep)  
             else:
                 # ignore other operations
                 pass
@@ -595,17 +1181,15 @@ class VideoRoomSubscriber(object):
                 self.webrtc_started = False
                 self._paused = True
                 self.sdp = ''
+                self._wait_sdp_answer = False
+                self.streams.clear()
+                self.streams_bymid.clear()
 
-                if self._owner:
-                    # remove from room
-                    publisher = self._owner
-                    self._owner = None
-                    publisher.del_subscription(self)
-
-                if self._feed:
-                    publisher = self._feed
-                    self._feed = None
+                for publisher in self._feeds.values():
                     publisher.del_subscriber(self)
+                self._feeds.clear()
+                self._data_feed_ids.clear()
+                self._media_feed_ids.clear()
 
             params = dict()
             for key, value in event_msg.items():
@@ -621,19 +1205,42 @@ class VideoRoomSubscriber(object):
         self.destroy()
 
     def on_feed_hangup(self, publisher):
-        if self._feed == publisher:
-            self._feed = None
-            self._feed_id = 0
+
+        self._data_feed_ids.discard(publisher.user_id)
+        self._media_feed_ids.discard(publisher.user_id)
+        self._feeds.pop(publisher.user_id, None)
 
     def on_owner_destroy(self, publisher):
         if self._owner == publisher:
             self._owner = None
 
 
-class VideoRoomPublisher(object):
+class PublisherStream(object):
+    def __init__(self, mindex: int, type: str, mid: str, 
+                 disabled=False, codec='', 
+                 description='', moderated=False, 
+                 fec=False, dtx=False, stereo=False,
+                 audiolevel_ext=False, talking=False,
+                 h264_profile='', vp9_profile='',
+                 simulcast=False, svc=False):
+        self.mindex = mindex
+        self.type = type
+        self.mid = mid
+        self.disabled = disabled
+        self.codec = codec
+        self.description = description
+        self.moderated = moderated
+        self.fec = fec
+        self.dtx = dtx
+        self.stereo = stereo
+        self.audiolevel_ext = audiolevel_ext
+        self.talking = talking
+        self.h264_profile = h264_profile
+        self.vp9_profile = vp9_profile
+        self.simulcast = simulcast
+        self.svc = svc
 
-    SIMULCAST_FIREFOX_PATTERN = re.compile(r'(a=rid:\S+ send)|(a=simulcast)')
-    SIMULCAST_CHROME_PATTERN = re.compile(r'a=ssrc-group:SIM')
+class VideoRoomPublisher(object):
 
     def __init__(self, user_id, handle, display=''):
         self.user_id = user_id     # Unique ID in the room
@@ -642,22 +1249,20 @@ class VideoRoomPublisher(object):
         self.room = None      # Room
         self.room_id = 0      # deal later
         self.webrtc_started = False  # webrtc peerconnection is up or not
-        self.talking = False
+
         self.sdp = ''              # The SDP this publisher negotiated, if any
         self.acodec = ''           # Audio codec this publisher is using
         self.vcodec = ''           # Video codec this publisher is using
-        self.audio_active = True
-        self.video_active = True
-        self.data_active = True
-        self.simulcast = False
-        self.audiolevel_ext = False
+
         self.user_audio_active_packets = 0  # Participant's audio_active_packets overwriting global room setting
         self.user_audio_level_average = 0  # Participant's audio_level_average overwriting global room setting
-        self.pvt_id = 0     # This is sent to the publisher for mapping purposes, but shouldn't be shared with others
 
-        self.audio_muted = False
-        self.video_muted = False
-        self.data_muted = False
+        self.pvt_id = 0     # This is sent to the publisher for mapping purposes, but shouldn't be shared with others
+        self.e2ee = False
+
+        self.data_stream = None   # whether thereis data-type stream 
+        self.streams = []
+        self.streams_bymid = {}
 
         self._rtp_forwarders = {}
 
@@ -682,6 +1287,10 @@ class VideoRoomPublisher(object):
             return
         self._has_destroyed = True
 
+        self.streams.clear()
+        self.streams_bymid.clear()
+        self.data_stream = None
+
         if len(self._subscriptions) > 0:
             subscriptions = self._subscriptions.copy()
             self._subscriptions.clear()
@@ -689,7 +1298,6 @@ class VideoRoomPublisher(object):
                 subscriber.on_owner_destroy(self)
 
         self._rtp_forwarders.clear()
-
 
         if self._backend_room:
             self._backend_room.del_publisher(self.user_id)
@@ -703,7 +1311,6 @@ class VideoRoomPublisher(object):
 
         if self._backend_handle:
             backend_handle = self._backend_handle
-
             self._backend_handle = None
 
 
@@ -719,8 +1326,6 @@ class VideoRoomPublisher(object):
             # 2. detach the backend_handle
             backend_handle.detach()
 
-
-
         if self.webrtc_started:
             self.webrtc_started = False
             if self._frontend_handle:
@@ -735,6 +1340,8 @@ class VideoRoomPublisher(object):
             self._frontend_handle.on_participant_detach(self)
             self._frontend_handle = None
 
+        log.info('Video Room Publisher "{0}"({1}) is destroyed'.format(self.user_id, self.display))
+
     def __str__(self):
         return 'Video Room Publisher "{0}"({1})'.format(self.user_id, self.display)
 
@@ -743,16 +1350,16 @@ class VideoRoomPublisher(object):
             raise JanusCloudError('Already destroyed {} ({})'.format(self.user_id, self.display),
                                   JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED)
 
-    def connect_backend(self, backend_room):
+    def join(self, room, backend_room):
         self._assert_valid()
+
         if self._backend_handle is not None:
             raise JanusCloudError('Already construct backend handle {} ({})'.format(self.user_id, self.display),
                                   JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND)
-        if self.room is None:
-            raise JanusCloudError('Publisher {} ({})  not in a room '.format(self.user_id, self.display),
-                                  JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
+        if self.room is not None:
+            raise JanusCloudError('Already in as a publisher on this handle',
+                                    JANUS_VIDEOROOM_ERROR_ALREADY_JOINED)
 
-        
         # backend session
         backend_session = get_backend_session(backend_room.server_url,
                                               auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
@@ -780,44 +1387,105 @@ class VideoRoomPublisher(object):
         self._backend_room = backend_room
         backend_room.add_publisher(self.user_id)
 
+        self.room = room
+        self.room_id = room.room_id
+
     def get_backend_room(self):
         return self._backend_room
 
-    def _check_sdp_simulcast(self, sdp):
-        # check fro rid (firefox support)
-        if VideoRoomPublisher.SIMULCAST_CHROME_PATTERN.search(sdp):
-            return True
-        if VideoRoomPublisher.SIMULCAST_FIREFOX_PATTERN.search(sdp):
-            return True
-        return False
+    def _update_streams(self, streams_info):
+        
+        org_streams_bymid = self.streams_bymid.copy()
+        self.streams.clear()
+        self.streams_bymid.clear()
+        self.data_stream = None
 
-    def publish(self, audio=None, video=None, data=None,
+        for index, stream_info in enumerate(streams_info):
+            stream_info = dict(stream_info)
+            mindex = stream_info.pop('mindex', index)
+
+            stream = PublisherStream(mindex=mindex, **stream_info)
+            # Some of the stream's properties can not be acquired from the new streams_info,
+            # so they are acruired from the old one
+            org_stream = org_streams_bymid.get(stream.mid)
+            if org_stream:
+                stream.audiolevel_ext = org_stream.audiolevel_ext
+                stream.talking = org_stream.talking
+                stream.moderated = org_stream.moderated
+
+            self.streams.append(stream)
+            self.streams_bymid[stream.mid] = stream
+            if stream.type == 'data':
+                self.data_stream = stream
+
+        del org_streams_bymid
+
+    def streams_info(self):
+        media = []
+        for stream in self.streams:
+            info = {
+                'type': stream.type,
+                'mindex': stream.mindex,
+                'mid': stream.mid
+            }
+            if stream.disabled:
+                info['disabled'] = True
+            else:
+                if stream.description:
+                    info['description'] = stream.description
+                if stream.moderated:
+                    info['moderated'] = True
+
+                if stream.type == 'audio':
+                    info['codec'] = stream.codec
+                    if stream.fec:
+                        info['fec'] = True
+                    if stream.dtx:
+                        info['dtx'] = True
+                    if stream.stereo:
+                        info['stereo'] = True
+                    if stream.audiolevel_ext:
+                        info['talking'] = stream.talking
+                elif stream.type == 'video':
+                    info['codec'] = stream.codec
+                    if stream.codec == 'h264' and stream.h264_profile:
+                        info['h264_profile'] = stream.h264_profile
+                    if stream.codec == 'vp9' and stream.vp9_profile:
+                        info['vp9_profile'] = stream.vp9_profile
+                    if stream.simulcast:
+                        info['simulcast'] = True
+                    if stream.svc:
+                        info['svc'] = True
+            media.append(info)
+        return media
+
+    def publish(self, 
                 audiocodec='', videocodec='',
                 bitrate=-1,
                 record=None, filename='',
                 display='',
                 secret='',
                 audio_active_packets=0, audio_level_average=0,
-                min_delay=-1, max_delay=-1,
+                descriptions=[],
                 jsep=None,
                 **kwargs):
         self._assert_valid()
-        if self.sdp:
+        if self.sdp or self.webrtc_started:
             raise JanusCloudError('Can\'t publish, already published',
                                   JANUS_VIDEOROOM_ERROR_ALREADY_PUBLISHED)
 
-        return self.configure(audio=audio, video=video, data=data,
-                              audiocodec=audiocodec, videocodec=videocodec,
+        return self.configure(audiocodec=audiocodec, videocodec=videocodec,
                               bitrate=bitrate,
                               record=record, filename=filename,
                               display=display,
                               secret=secret,
                               audio_active_packets=audio_active_packets, audio_level_average=audio_level_average,
-                              min_delay=min_delay, max_delay=max_delay,
+                              descriptions=descriptions,
                               jsep=jsep,
                               **kwargs)
 
-    def configure(self, audio=None, video=None, data=None,
+    def configure(self, mid='', send=None, 
+                  audio=None, video=None, data=None,
                   audiocodec='', videocodec='',
                   bitrate=-1, keyframe=False,
                   record=None, filename='',
@@ -825,8 +1493,11 @@ class VideoRoomPublisher(object):
                   audio_active_packets=0, audio_level_average=0,
                   min_delay=-1, max_delay=-1,
                   display='', update=False,
+                  descriptions=[],
+                  streams=[],
                   jsep=None,
                   **kwargs):
+
         # check param conflict
         self._assert_valid()
         if self._backend_handle is None:
@@ -850,6 +1521,21 @@ class VideoRoomPublisher(object):
                                       JANUS_VIDEOROOM_ERROR_ALREADY_PUBLISHED)
             # log.debug('Participant asked for video codec \'{}\' (room {}, user {})'.format(
             #     videocodec, self.room_id, self.user_id))
+        e2ee = jsep.get('e2ee', False) if jsep is not None else False
+        if self.room and self.room.require_e2ee and not e2ee and not self.e2ee:
+            log.error('Room requires end-to-end encrypted media')
+            raise JanusCloudError('Room requires end-to-end encrypted media',
+                                   JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)       
+
+        # check twhether the given mid exists
+        if streams:
+            for stream in streams:
+                if stream.get('mid', '') not in self.streams_bymid:
+                    raise JanusCloudError('No such mid \'{}\' published'.format(mid),
+                                           JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)     
+        elif mid and mid not in self.streams_bymid:
+            raise JanusCloudError('No such mid \'{}\' published'.format(mid),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)          
 
         # check record lock
         record_locked = False
@@ -861,31 +1547,49 @@ class VideoRoomPublisher(object):
         # send request to backend
         body = {
             'request': 'configure',
-            'update': update,
-            'keyframe': keyframe,
         }
-        if audio is not None:
-            body['audio'] = audio
-        if video is not None:
-            body['video'] = video
-        if data is not None:
-            body['data'] = data
+        if streams:
+            body['streams'] = streams
+            audio = None
+            video = None
+            data = None
+            
+        else:
+            if mid:
+                body['mid'] = mid
+            if send is not None:
+                body['send'] = send            
+            if keyframe:
+                body['keyframe'] = keyframe
+            if min_delay >= 0:
+                body['min_delay'] = min_delay
+            if max_delay >= 0:
+                body['max_delay'] = max_delay
+            if audio is not None:
+                body['audio'] = audio
+            if video is not None:
+                body['video'] = video
+            if data is not None:
+                body['data'] = data
+
+        if update:
+            body['update'] = update
         if audiocodec:
             body['audiocodec'] = audiocodec
         if videocodec:
             body['videocodec'] = videocodec
         if bitrate >= 0:
             body['bitrate'] = bitrate
+        if descriptions:
+            body['descriptions'] = descriptions
 
         if record is not None and not record_locked:
-            if record != self._record_active: # differ from the current setting
-                body['record'] = record
+            body['record'] = record
         else:
             if self._record_active is None: # not yet configured, use room's record setting
                 body['record'] = self.room.record
             else:  # already configured, not change
                 pass
-
         if filename and not record_locked:
             body['filename'] = filename
         if display:
@@ -894,10 +1598,7 @@ class VideoRoomPublisher(object):
             body['audio_active_packets'] = audio_active_packets
         if audio_level_average:
             body['audio_level_average'] = audio_level_average
-        if min_delay >= 0:
-            body['min_delay'] = min_delay
-        if max_delay >= 0:
-            body['max_delay'] = max_delay
+
 
         # other future parameters
         if len(kwargs) > 0:
@@ -908,16 +1609,64 @@ class VideoRoomPublisher(object):
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body, jsep=jsep)
 
         # successful
-        
+        if 'streams' in reply_data:
+            self._update_streams(reply_data['streams'])
+
         if reply_jsep:
             self.sdp = reply_jsep.get('sdp', '')
             log.debug('Setting sdp property len={} (room {}, user {})'.format(
                 len(self.sdp), self.room_id, self.user_id))
-        if 'audio_codec' in reply_data:
+            if e2ee and not self.e2ee:
+                self.e2ee = True   
+                log.debug('Publisher (room {}, user {}) is going to do end-to-end media encryption'.format(
+                    self.room_id, self.user_id))         
+        
+        # print the media send or not
+        if streams:
+            for stream in streams:
+                ps = self.streams_bymid.get(stream['mid'])
+                active = stream.get('send')
+                if ps is not None and active is not None:
+                    if ps.type == 'audio':
+                        log.debug('Setting audio property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))                    
+                    elif ps.type == 'video':
+                        log.debug('Setting video property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))  
+                    elif ps.type == 'data':
+                        log.debug('Setting data property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))      
+        else:
+            if (audio is not None) or (video is not None) or \
+            (data is not None) or (mid and send is not None):
+                for ps in self.streams:
+                    mid_found = mid and (send is not None) and (mid == ps.mid)
+                    if ps.type == 'audio' and ((audio is not None ) or mid_found):
+                        active = send if mid_found else audio
+                        log.debug('Setting audio property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))                    
+                    elif ps.type == 'video' and ((video is not None ) or mid_found):
+                        active = send if mid_found else video
+                        log.debug('Setting video property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))  
+                    elif ps.type == 'data' and ((data is not None ) or mid_found):
+                        active = send if mid_found else data
+                        log.debug('Setting data property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))  
+
+        if audiocodec and jsep: 
+            self.acodec = audiocodec
+            log.debug('Setting audio codec property: {} (room {}, user {})'.format(
+                self.acodec, self.room_id, self.user_id))            
+        elif 'audio_codec' in reply_data:
             self.acodec = reply_data['audio_codec']
             log.debug('Setting audio codec property: {} (room {}, user {})'.format(
                 self.acodec, self.room_id, self.user_id))
-        if 'video_codec' in reply_data:
+        if videocodec and jsep:
+            self.vcodec = videocodec
+            log.debug('Setting video codec property: {} (room {}, user {})'.format(
+                self.vcodec, self.room_id, self.user_id))
+        elif 'video_codec' in reply_data:
             self.vcodec = reply_data['video_codec']
             log.debug('Setting video codec property: {} (room {}, user {})'.format(
                 self.vcodec, self.room_id, self.user_id))
@@ -925,27 +1674,17 @@ class VideoRoomPublisher(object):
             sdp = jsep.get('sdp', '')
             if sdp:
                 if self.room.audiolevel_ext and JANUS_RTP_EXTMAP_AUDIO_LEVEL in sdp:
-                    self.audiolevel_ext = True
+                    for stream in self.streams:
+                        if stream.type == 'audio':
+                            stream.audiolevel_ext = True
                 else:
-                    self.audiolevel_ext = False
-                log.debug('Setting audiolevel_ext property: {} (room {}, user {})'.format(
-                    self.audiolevel_ext, self.room_id, self.user_id))
-                self.simulcast = self._check_sdp_simulcast(sdp)
-                log.debug('Setting simulcast property: {} (room {}, user {})'.format(
-                    self.simulcast, self.room_id, self.user_id))
+                    for stream in self.streams:
+                        if stream.type == 'audio':
+                            stream.audiolevel_ext = False
 
-        if audio is not None:
-            self.audio_active = audio
-            log.debug('Setting audio property: {} (room {}, user {})'.format(
-                audio, self.room_id, self.user_id))
-        if video is not None:
-            self.video_active = video
-            log.debug('Setting video property: {} (room {}, user {})'.format(
-                video, self.room_id, self.user_id))
-        if data is not None:
-            self.data_active = data
-            log.debug('Setting data property: {} (room {}, user {})'.format(
-                data, self.room_id, self.user_id))
+        if bitrate >= 0:
+            log.debug('Setting video bitrate: {} (room {}, user {})'.format(
+                bitrate, self.room_id, self.user_id))            
         if audio_active_packets:
             self.user_audio_active_packets = audio_active_packets
             log.debug('Setting user audio_active_packet: {} (room {}, user {})'.format(
@@ -955,9 +1694,16 @@ class VideoRoomPublisher(object):
             log.debug('Setting user audio_level_average: {} (room {}, user {})'.format(
                 audio_level_average, self.room_id, self.user_id))
 
+        if record is not None and not record_locked:
+            log.debug('Setting record property: {} (room {}, user {})'.format(
+                record, self.room_id, self.user_id))
+        if filename and not record_locked:
+            log.debug('Setting recording basename: {} (room {}, user {})'.format(
+                filename, self.room_id, self.user_id))
+
         self._record_active = body.get('record', self._record_active)
 
-        if display:
+        if display and display != self.display:
             self.display = display
             display_event = {
                 'videoroom': 'event',
@@ -967,6 +1713,24 @@ class VideoRoomPublisher(object):
             if self.room:
                 self.room.notify_other_participants(self, display_event)
 
+        if descriptions and (jsep is None or jsep.get('sdp') is None):
+            # We only do this here if this is an SDP-less configure: in case
+            # a sdp negotiation is involved, descriptions are updated later */
+            desc_updated = False
+            for d in descriptions:
+                d_mid = d.get('mid', '')
+                d_desc = d.get('description', '') 
+                ps = self.streams_bymid.get(mid)
+                if ps and d_desc and ps.description != d_desc:
+                    desc_updated = True
+                    ps.description = d_desc
+
+            if desc_updated:
+                # If at least a description changed, n
+                # otify everyone else about the publisher details
+                if self.room:
+                    self.room.notify_about_publisher(self)
+
         return reply_jsep
 
     def unpublish(self):
@@ -974,14 +1738,14 @@ class VideoRoomPublisher(object):
         if self._backend_handle is None:
             raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
                                   JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
-        if self.sdp == '':
+        if self.sdp == '' or not self.webrtc_started:
             raise JanusCloudError('Can\'t unpublish, not published',
                                   JANUS_VIDEOROOM_ERROR_NOT_PUBLISHED)
 
         _send_backend_message(self._backend_handle, {
             'request': 'unpublish',
         })
-
+    
     def rtp_forward(self, host, **kwargs):
 
         self._assert_valid()
@@ -1004,48 +1768,46 @@ class VideoRoomPublisher(object):
                     body[k] = v
 
         reply_data, reply_jsep = _send_backend_message(self._backend_handle, body=body)
-        rtp_stream = reply_data.get('rtp_stream', {})
+        if 'forwarders' in reply_data:
+            forwarders = reply_data.get('forwarders', [])
+            for forwarder in forwarders:
+                stream_id = forwarder.get('stream_id', 0)
+                if stream_id:
+                    self._rtp_forwarders[stream_id] = forwarder
+                    forwarder['local_host'] = urlparse(self._backend_room.server_url).hostname
+                    
+            return forwarders
+        elif 'rtp_stream' in reply_data:
+            #  Old deprecated approach 
+            rtp_stream = reply_data.get('rtp_stream', {})
 
-        # get the new stream id
-        new_rtp_stream_ids = set()
-        for key, value in rtp_stream.items():
-            if key == 'audio_stream_id' or key == 'video_stream_id' or key == 'video_stream_id_2' or \
-               key == 'video_stream_id_3' or key == 'data_stream_id':
-                new_rtp_stream_ids.add(value)
+            # get the new stream id
+            new_rtp_stream_ids = set()
+            for key, value in rtp_stream.items():
+                if key == 'audio_stream_id' or key == 'video_stream_id' or key == 'video_stream_id_2' or \
+                key == 'video_stream_id_3' or key == 'data_stream_id':
+                    new_rtp_stream_ids.add(value)
 
-        # get the new forwarder info
-        reply_data, reply_jsep = _send_backend_message(self._backend_handle, body={
-            'request': 'listforwarders',
-            'room': self._backend_room.backend_room_id,
-        })
-        backend_rtp_forwarders = []
-        for publisher in reply_data.get('rtp_forwarders', []):
-            if publisher.get('publisher_id', 0) == self.user_id:
-                backend_rtp_forwarders = publisher.get('rtp_forwarder', [])
-                if len(backend_rtp_forwarders) == 0:
-                    backend_rtp_forwarders = publisher.get('rtp_forwarders', [])
-                break
-        for backend_rtp_forwarder in backend_rtp_forwarders:
-            stream_id = None
-            if stream_id is None:
-                stream_id = backend_rtp_forwarder.get('audio_stream_id')
-            if stream_id is None:
-                stream_id = backend_rtp_forwarder.get('video_stream_id')
-            if stream_id is None:
-                stream_id = backend_rtp_forwarder.get('data_stream_id')
-            if stream_id is None or stream_id not in new_rtp_stream_ids:
-                continue
+            # get the new forwarder info
+            reply_data, reply_jsep = _send_backend_message(self._backend_handle, body={
+                'request': 'listforwarders',
+                'room': self._backend_room.backend_room_id,
+            })
+            forwarders = []
+            for publisher in reply_data.get('publishers', []):
+                if publisher.get('publisher_id', 0) == self.user_id:
+                    forwarders = publisher.get('forwarders', [])
+                    break
+            for forwarder in forwarders:
+                stream_id = forwarder.get('stream_id', 0)
+                if stream_id in new_rtp_stream_ids:
+                    # this backend_rtp_forwarder is the new added one
+                    self._rtp_forwarders[stream_id] = forwarder
+                    # add local_rtcp_host key                
+                    forwarder['local_host'] = urlparse(self._backend_room.server_url).hostname
 
-            # this backend_rtp_forwarder is the new added one
-
-            # add local_rtcp_host key
-            if 'local_rtcp_port' in backend_rtp_forwarder and \
-               'local_rtcp_host' not in backend_rtp_forwarder:
-                backend_rtp_forwarder['local_rtcp_host'] = urlparse(self._backend_room.server_url).hostname
-
-            self._rtp_forwarders[stream_id] = backend_rtp_forwarder
-
-        return rtp_stream
+            return rtp_stream
+        
 
     def stop_rtp_forward(self, stream_id):
         self._assert_valid()
@@ -1066,7 +1828,6 @@ class VideoRoomPublisher(object):
         }
         if self._backend_room.backend_admin_key:
             body['admin_key'] = self._backend_room.backend_admin_key
-
 
         _send_backend_message(self._backend_handle, body=body)
 
@@ -1113,24 +1874,25 @@ class VideoRoomPublisher(object):
 
         self._record_active = record
 
-    def moderate(self, mute_audio=None, mute_video=None, mute_data=None):
+    def moderate(self, mid: str, mute: bool):
         self._assert_valid()
         if self._backend_handle is None:
             raise JanusCloudError('Backend handle invalid for publisher {}({})'.format(self.user_id, self.display),
                                   JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
 
+        if mid not in self.streams_bymid:
+            raise JanusCloudError('No such stream {}'.format(mid),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)  
+
+    
         # send request to backend
         body = {
             'request': 'moderate',
             'room': self._backend_room.backend_room_id,
             'id': self.user_id,
+            'mid': mid,
+            'mute': mute
         }
-        if mute_audio is not None:
-            body['mute_audio'] = bool(mute_audio)
-        if mute_video is not None:
-            body['mute_video'] = bool(mute_video)
-        if mute_data is not None:
-            body['mute_data'] = bool(mute_data)
 
         _send_backend_message(self._backend_handle, body=body)
 
@@ -1173,11 +1935,20 @@ class VideoRoomPublisher(object):
                     # it's other publisher's talking/stopped-talking event
                     # ignore
                     return
-
+                
+                mindex = data.get('mindex')
+                if mindex is None:
+                    # invalid, ignore
+                    return
+                if mindex >= len(self.streams):
+                    # invalid, ignore
+                    return
+                ps = self.streams[mindex]
                 if op == 'talking':
-                    self.talking = True
+                    ps.talking = True
                 else:
-                    self.talking = False
+                    ps.talking = False
+                    
                 if self.room is not None and self.room.audiolevel_event:
                     talk_event = data.copy()
                     talk_event['id'] = self.user_id
@@ -1187,9 +1958,7 @@ class VideoRoomPublisher(object):
                     if self.room:
                         self.room.notify_other_participants(self, talk_event)
             elif op == 'event':
-                if ('audio-moderation' in data) \
-                  or ('video-moderation' in data) \
-                  or ('data-moderation' in data):
+                if ('moderation' in data) :
 
                     id = data.get('id', 0)
                     if id != self.user_id:
@@ -1197,25 +1966,19 @@ class VideoRoomPublisher(object):
                         # ignore
                         return                    
                     # update self property
-                    audio_moderation = data.get('audio-moderation')
-                    video_moderation = data.get('video-moderation')
-                    data_moderation = data.get('data-moderation')
-                    if audio_moderation:
-                        if audio_moderation == 'muted':
-                            self.audio_muted = True
-                        elif audio_moderation == 'unmuted':
-                            self.audio_muted = False
-                    if video_moderation:
-                        if video_moderation == 'muted':
-                            self.video_muted = True
-                        elif video_moderation == 'unmuted':
-                            self.video_muted = False
-                    if data_moderation:
-                        if data_moderation == 'muted':
-                            self.data_muted = True
-                        elif data_moderation == 'unmuted':
-                            self.data_muted = False
-
+                    ps = self.streams_bymid.get(data.get('mid', ''))
+                    if ps is None:
+                        # invalid mid, ignore
+                        return
+                    moderation = data.get('moderation')
+                    if moderation:
+                        if moderation == 'muted':
+                            ps.moderated = True
+                        elif moderation == 'unmuted':
+                            ps.moderated = False
+                        else:
+                            # invalid string, ignore
+                            return
                     moderation_event = data.copy()
                     moderation_event['id'] = self.user_id
                     moderation_event['room'] = self.room_id
@@ -1233,48 +1996,28 @@ class VideoRoomPublisher(object):
             if event_msg['janus'] == 'webrtcup':
                 # webrtc pc is up
                 self.webrtc_started = True
+                log.info('Pulisher (id:{}, display:{}) PeerConnection startup'.format(
+                        self.user_id, self.display))
 
-                # notify others about publish
-                publisher_info = {
-                    'id': self.user_id,
-                }
-                if self.display:
-                    publisher_info['display'] = self.display
-                if self.acodec:
-                    publisher_info['audio_codec'] = self.acodec
-                if self.vcodec:
-                    publisher_info['video_codec'] = self.vcodec
-                if self.simulcast:
-                    publisher_info['simulcast'] = True
-                if self.audiolevel_ext:
-                    publisher_info['talking'] = self.talking
-                if self.audio_muted:
-                    publisher_info['audio_moderated'] = True
-                if self.video_muted:
-                    publisher_info['video_moderated'] = True
-                if self.data_muted:
-                    publisher_info['data_moderated'] = True
-                pub_event = {
-                    'videoroom': 'event',
-                    'room': self.room_id,
-                    'publishers': [publisher_info]
-                }
                 if self.room:
-                    self.room.notify_other_participants(self, pub_event)
+                    self.room.notify_about_publisher(self)
 
             elif event_msg['janus'] == 'hangup':
                 # webrtc pc is closed
                 self.webrtc_started = False
+
+                self.streams.clear()
+                self.streams_bymid.clear()
+                self.data_stream = None
+
                 self.acodec = ''
-                self.audio_active = False
                 self.vcodec = ''
-                self.video_active = False
-                self.data_active = False
-                self.simulcast = False
-                self.talking = False
                 self.sdp = ''
                 self.user_audio_active_packets = 0
                 self.user_audio_level_average = 0
+
+                log.info('Pulisher (id:{}, display:{}) PeerConnection hangup'.format(
+                        self.user_id, self.display))
 
                 # notify other participant unpublished
                 unpub_event = {
@@ -1305,9 +2048,15 @@ class VideoRoomPublisher(object):
 
         self._backend_handle = None #detach with backend handle
      
-
         if self.room:
-            self.room.kick_participant(self.user_id)
+            # simulate kick this publisher
+            kick_event = {
+                'videoroom': 'event',
+                'room': self.room_id,
+                'leaving': 'ok',
+                'reason': 'kicked',
+            }
+            self.push_videoroom_event(kick_event)
 
         self.destroy()
 
@@ -1327,7 +2076,7 @@ class BackendRoom(object):
         self._edit_cache = {}
 
 
-        log.debug('Backend room "{}"({}) is created'.format(
+        log.info('Backend room "{}"({}) is created'.format(
             self.backend_room_id, 
             self.server_url))             
         
@@ -1362,7 +2111,7 @@ class BackendRoom(object):
             pass   # ignore destroy failed
 
         
-        log.debug('Backend room "{}"({}) is destroyed'.
+        log.info('Backend room "{}"({}) is destroyed'.
                     format(self.backend_room_id, self.server_url)) 
                     
     def activate(self, room):
@@ -1387,7 +2136,7 @@ class BackendRoom(object):
 
                     self._backend_publishers.clear() # surely no publishers for new backend room
 
-                    log.debug('Backend room "{}"({}) is re-created on the backend'.format(
+                    log.info('Backend room "{}"({}) is re-created on the backend'.format(
                                 self.backend_room_id, 
                                 self.server_url))    
                 except Exception as e:
@@ -1448,7 +2197,7 @@ class BackendRoom(object):
             else:
                 backend_handle.detach()  
 
-            log.debug('Backend room "{}"({}) is (re)activated on the backend'.format(
+            log.info('Backend room "{}"({}) is (re)activated on the backend'.format(
                         self.backend_room_id, 
                         self.server_url)) 
  
@@ -1739,6 +2488,7 @@ class VideoRoom(object):
         for backend_room in backend_rooms:
             backend_room.destroy()
 
+        log.info("Room {} is destroyed".format(self.room_id))
 
     def update(self):
         self.utime = time.time()
@@ -1835,58 +2585,63 @@ class VideoRoom(object):
         log.debug('  -- Publisher ID: {}'.format(user_id))
 
 
-        publisher = VideoRoomPublisher(user_id=user_id, handle=handle,
+        new_publisher = VideoRoomPublisher(user_id=user_id, handle=handle,
                                        display=display)
+        log.info('A new pulisher (id:{}, display:{}) is created on handle {}'.format(
+            new_publisher.user_id, new_publisher.display, handle.handle_id))
+
         try:
-            # attach to the room
-            publisher.room = self
-            publisher.room_id = self.room_id
             self._creating_user_id.add(user_id)
 
             # activate backend room
             backend_room = self.activate_backend_room(backend_server) 
 
-            # connect to backend
-            publisher.connect_backend(backend_room)
+            # join the room
+            new_publisher.join(room=self, backend_room=backend_room)
 
         except Exception:
-            publisher.room = None
-            publisher.room_id = 0    
+            new_publisher.room = None
+            new_publisher.room_id = 0    
             self._creating_user_id.discard(user_id)       
-            publisher.destroy()
+            new_publisher.destroy()
             raise
 
         # get pvt id
-        publisher.pvt_id = random_uint32()
-        while publisher.pvt_id in self._private_id:
-            publisher.pvt_id = random_uint32()
+        new_publisher.pvt_id = random_uint32()
+        while new_publisher.pvt_id in self._private_id:
+            new_publisher.pvt_id = random_uint32()
 
         # add to the room
-        self._participants[user_id] = publisher
-        self._private_id[publisher.pvt_id] = publisher
+        self._participants[user_id] = new_publisher
+        self._private_id[new_publisher.pvt_id] = new_publisher
         self._creating_user_id.discard(user_id)
+
         self.check_idle()
+
+        
 
         # notify other new participant join
         if self.notify_joining:
             user = {
-                'id': publisher.user_id
+                'id': new_publisher.user_id
             }
-            if publisher.display:
-                user['display'] = publisher.display
+            if new_publisher.display:
+                user['display'] = new_publisher.display
             event = {
                 'videoroom': 'event',
                 'room': self.room_id,
                 'joining': user
             }
-            self.notify_other_participants(publisher, event)    
+            self.notify_other_participants(new_publisher, event)    
 
-        return publisher
 
-    def new_subscriber(self, handle, pvt_id=0):
+        return new_publisher
+
+    def new_subscriber(self, handle, pvt_id=0, **join_params):
 
         if handle is None:
             raise JanusCloudError('handle invalid', JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
+
         self._assert_valid()
 
         owner = None
@@ -1896,12 +2651,18 @@ class VideoRoom(object):
                 raise JanusCloudError('Unauthorized (this room requires a valid private_id)',
                                       JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)
 
-        new_subscriber = VideoRoomSubscriber(handle=handle, pvt_id=pvt_id,
-                                             owner=owner, room_id=self.room_id)
+        new_subscriber = VideoRoomSubscriber(handle=handle, owner=owner)
         if owner:
             owner.add_subscription(new_subscriber)
+        try:
+            # join the room
+            jsep = new_subscriber.join(room=self, **join_params)
 
-        return new_subscriber
+        except Exception:
+            new_subscriber.destroy()
+            raise        
+
+        return new_subscriber, jsep
 
     def get_participant_by_pvt_id(self, pvt_id):
         return self._private_id.get(pvt_id)
@@ -1968,16 +2729,6 @@ class VideoRoom(object):
             return  # already removed
         self._private_id.pop(publisher.pvt_id, None)
 
-
-
-#        if publisher.webrtc_started:
-#            event = {
-#                'videoroom': 'event',
-#                'room': self.room_id,
-#                'unpublished': participant_id
-#            }
-#            self.notify_other_participants(publisher, event)
-
         event = {
             'videoroom': 'event',
             'room': self.room_id,
@@ -1986,6 +2737,67 @@ class VideoRoom(object):
         self.notify_other_participants(publisher, event)
 
         self.check_idle()
+
+    def notify_about_publisher(self, publisher):
+
+        pl = {'id': publisher.user_id}
+        if publisher.display:
+            pl['display'] = publisher.display
+        audio_added = False
+        video_added = False
+        media = []
+        for stream in publisher.streams:
+            info = {
+                'type': stream.type,
+                'mindex': stream.mindex,
+                'mid': stream.mid
+            }
+            if stream.disabled:
+                info['disabled'] = True
+            else:
+                if stream.description:
+                    info['description'] = stream.description
+                if stream.moderated:
+                    info['moderated'] = True
+
+                if stream.type == 'audio':
+                    info['codec'] = stream.codec
+
+                    if not audio_added:
+                        audio_added = True
+                        pl['audio_codec'] = stream.codec
+
+                    if stream.codec == 'opus':
+                        if stream.fec:
+                            info['fec'] = True
+                        if stream.dtx:
+                            info['dtx'] = True
+                        if stream.stereo:
+                            info['stereo'] = True
+                    
+                elif stream.type == 'video':
+                    info['codec'] = stream.codec
+                    if not video_added:
+                        video_added = True
+                        pl['video_codec'] = stream.codec
+                    if stream.codec == 'h264' and stream.h264_profile:
+                        info['h264_profile'] = stream.h264_profile
+                    if stream.codec == 'vp9' and stream.vp9_profile:
+                        info['vp9_profile'] = stream.vp9_profile                    
+                    if stream.simulcast:
+                        info['simulcast'] = True
+                    if stream.svc:
+                        info['svc'] = True
+            media.append(info)
+        pl['streams'] = media
+
+        event = {
+            'videoroom': 'event',
+            'room': self.room_id,
+            'publishers':[pl]
+        }
+        self.notify_other_participants(publisher, event)
+
 
     def notify_other_participants(self, src_participant, event):
         
@@ -2115,15 +2927,15 @@ class VideoRoomManager(object):
             self._public_rooms_list.append(new_room)
 
         # debug print the new room info
-        log.debug('Created videoroom: {0} ({1}, private: {2}, {3}/{4} codecs, secret: {5}, pin: {6}, pvtid:{7})'.format(
+        log.info('Created videoroom: {0} ({1}, private: {2}, {3}/{4} codecs, secret: {5}, pin: {6}, pvtid:{7})'.format(
             new_room.room_id, new_room.description, new_room.is_private,
             new_room.audiocodec, new_room.videocodec,
             new_room.secret, new_room.pin, new_room.require_pvtid
         ))
         if new_room.record:
-            log.debug('  -- Room is going to be recorded in {}'.format(new_room.rec_dir))
+            log.info('  -- Room is going to be recorded in {}'.format(new_room.rec_dir))
         if new_room.require_e2ee:
-            log.debug('  -- All publishers MUST use end-to-end encryption')
+            log.info('  -- All publishers MUST use end-to-end encryption')
 
         saved = False
         if permanent and self._room_dao is not None:
@@ -2248,7 +3060,8 @@ class VideoRoomManager(object):
                 # kick out all timeout session
                 for room in cleanup_rooms:
                     try:
-                        room.destroy()
+                        log.info('Video room {} timeout for auto cleanup'.format(room.room_id))   
+                        room.destroy()                                            
                     except Exception as e:
                         log.warning('Failed to destroy the empty room "{}": {}'.format(room.room_id, e))
 
@@ -2298,7 +3111,7 @@ class VideoRoomHandle(FrontendHandleBase):
         self._pending_candidates.clear()
 
     def handle_hangup(self):
-        log.debug('handle_hangup for videoroom Handle {}'.format(self.handle_id))
+        # log.debug('handle_hangup for videoroom Handle {}'.format(self.handle_id))
 
         if self.participant_type == JANUS_VIDEOROOM_P_TYPE_PUBLISHER:
             self.participant.hangup()
@@ -2306,8 +3119,8 @@ class VideoRoomHandle(FrontendHandleBase):
             self.participant.hangup()
 
     def handle_trickle(self, candidate=None, candidates=None):
-        log.debug('handle_trickle for videoroom handle {}.candidate:{} candidates:{}'.
-                  format(self.handle_id, candidate, candidates))
+        # log.debug('handle_trickle for videoroom handle {}.candidate:{} candidates:{}'.
+        #           format(self.handle_id, candidate, candidates))
 
         if self.participant_type == JANUS_VIDEOROOM_P_TYPE_NONE:
             # not join yet, buffer candidates
@@ -2322,8 +3135,8 @@ class VideoRoomHandle(FrontendHandleBase):
             self.participant.trickle(candidate=candidate, candidates=candidates)
 
     def handle_message(self, transaction, body, jsep=None):
-        log.debug('handle_message for videoroom handle {}. transaction:{} body:{} jsep:{}'.
-                 format(self.handle_id, transaction, body, jsep))
+        # log.debug('handle_message for videoroom handle {}. transaction:{} body:{} jsep:{}'.
+        #         format(self.handle_id, transaction, body, jsep))
         result = None
         try:
             request = body.get('request')
@@ -2544,12 +3357,16 @@ class VideoRoomHandle(FrontendHandleBase):
                 }
                 if publisher.display:
                     part_info['display'] = publisher.display
-
-                if publisher.webrtc_started and publisher.audiolevel_ext:
-                    part_info['talking'] = publisher.talking
-
+              
                 if publisher.webrtc_started:
-                    part_info['subscribers'] = publisher.subscriber_num()
+                    found = False
+                    talking = False
+                    for ps in publisher.streams:
+                        if ps.type == 'audio' and ps.audiolevel_ext:
+                            found = True
+                            talking = True if ps.talking else talking
+                    if found: 
+                        part_info['talking'] = talking
 
                 part_info_list.append(part_info)
 
@@ -2572,7 +3389,7 @@ class VideoRoomHandle(FrontendHandleBase):
 
                 publisher_rtp_forwarder_info = {
                     'publisher_id': publisher.user_id,
-                    'rtp_forwarders': rtp_forwarder_list,
+                    'forwarders': rtp_forwarder_list,
                 }
                 if publisher.display:
                     publisher_rtp_forwarder_info['display'] = publisher.display
@@ -2582,7 +3399,7 @@ class VideoRoomHandle(FrontendHandleBase):
             result = {
                 'videoroom': 'listforwarders',
                 'room': room_base_info['room'],
-                'rtp_forwarders': publisher_rtp_forwarders
+                'publishers': publisher_rtp_forwarders
             }
         elif request == 'rtp_forward':
             log.debug('Attemp to start rtp forwarder')
@@ -2603,13 +3420,17 @@ class VideoRoomHandle(FrontendHandleBase):
                                       JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
 
             forward_params = rtp_forward_schema.validate(body)
-            rtp_stream = publisher.rtp_forward(**forward_params)
+            forwarders = publisher.rtp_forward(**forward_params)
+
             result = {
                 'videoroom': 'rtp_forward',
                 'room': room_base_info['room'],
-                'publisher_id': publisher_id,
-                'rtp_stream': rtp_stream
+                'publisher_id': publisher_id
             }
+            if isinstance(forwarders, dict):
+                result['rtp_stream'] = forwarders
+            else:
+                result['forwarders'] = forwarders
 
         elif request == 'stop_rtp_forward':
             log.debug('Attempt to stop one rtp forwarder')
@@ -2723,20 +3544,59 @@ class VideoRoomHandle(FrontendHandleBase):
                                     }
                                     if publisher.display:
                                         publisher_info['display'] = publisher.display
-                                    if publisher.acodec:
-                                        publisher_info['audio_codec'] = publisher.acodec
-                                    if publisher.vcodec:
-                                        publisher_info['video_codec'] = publisher.vcodec
-                                    if publisher.simulcast:
-                                        publisher_info['simulcast'] = True
-                                    if publisher.audiolevel_ext:
-                                        publisher_info['talking'] = publisher.talking
-                                    if publisher.audio_muted:
-                                        publisher_info['audio_moderated'] = True
-                                    if publisher.video_muted:
-                                        publisher_info['video_moderated'] = True
-                                    if publisher.data_muted:
-                                        publisher_info['data_moderated'] = True
+                                    audio_added = False
+                                    video_added = False
+                                    talking_found = False
+                                    talking = False
+                                    media = []
+                                    for ps in publisher.streams:
+                                        info = {
+                                            'type': ps.type,
+                                            'mindex': ps.mindex,
+                                            'mid': ps.mid
+                                        }
+                                        if ps.disabled:
+                                            info['disabled'] = True
+                                        else:
+                                            if ps.description:
+                                                info['description'] = ps.description
+
+                                            if ps.type == 'audio':
+                                                info['codec'] = ps.codec
+                                                if not audio_added:
+                                                    audio_added = True
+                                                    publisher_info['audio_codec'] = ps.codec
+                                                if ps.codec == 'opus':
+                                                    if ps.fec:
+                                                        info['fec'] = True
+                                                    if ps.dtx:
+                                                        info['dtx'] = True
+                                                    if ps.stereo:
+                                                        info['stereo'] = True
+                                                if ps.audiolevel_ext:
+                                                    info['talking'] = ps.talking
+                                                    talking_found = True
+                                                    talking = True if ps.talking else talking
+                                            elif ps.type == 'video':
+                                                info['codec'] = ps.codec
+                                                if not video_added:
+                                                    video_added = True
+                                                    publisher_info['video_codec'] = ps.codec                                            
+                                                if ps.codec == 'h264' and ps.h264_profile:
+                                                    info['h264_profile'] = ps.h264_profile
+                                                if ps.codec == 'vp9' and ps.vp9_profile:
+                                                    info['vp9_profile'] = ps.vp9_profile
+                                                if ps.simulcast:
+                                                    info['simulcast'] = True
+                                                if ps.svc:
+                                                    info['svc'] = True
+                                            if ps.moderated:
+                                                info['moderated'] = True
+                                        media.append(info)
+
+                                    publisher_info['streams'] = media
+                                    if talking_found:
+                                        publisher_info['talking'] = talking
                                     publishers.append(publisher_info)
 
                                 elif publisher != new_publisher and attendees is not None:
@@ -2762,30 +3622,44 @@ class VideoRoomHandle(FrontendHandleBase):
                             if new_publisher.user_audio_level_average:
                                 reply_event['user_audio_level_average'] = new_publisher.user_audio_level_average
 
+                            # For backwards compatibility
+                            if reply_jsep and new_publisher.vcodec:
+                                reply_event['video_codec'] = new_publisher.vcodec
+                            if reply_jsep and new_publisher.acodec:
+                                reply_event['audio_codec'] = new_publisher.acodec                            
+                            
+                            if reply_jsep:
+                                reply_event['streams'] = new_publisher.streams_info()
+
                         except Exception:
+                            self.participant_type = JANUS_VIDEOROOM_P_TYPE_NONE
+                            self.participant = None
                             if new_publisher:
                                 new_publisher.destroy()
                             raise
-                    elif ptype == 'subscriber' or ptype == 'listener':
-                        legacy = (ptype == 'listener')
-                        if legacy:
-                            log.warning('Subscriber is using the legacy \'listener\' ptype')
-
+                    elif ptype == 'subscriber' :
                         if request != 'join':
                             raise JanusCloudError('Invalid element (ptype)',
                                                   JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
+                        
                         log.debug("Configuring new subscriber")
                         join_params = subscriber_join_schema.validate(body)
                         pvt_id = join_params.pop('private_id', 0)
-                        feed_id = join_params.pop('feed')
-                        publisher = room.get_participant_by_user_id(feed_id)
-                        if publisher is None:
-                            raise JanusCloudError('No such feed ({})'.format(feed_id),
-                                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
 
-                        new_subscriber = room.new_subscriber(handle=self, pvt_id=pvt_id)
+                        legacy = False
+                        streams =  join_params.get('streams')
+                        if not streams:
+                            legacy_feed_id = join_params.get('feed', 0)
+                            legacy_publisher = room.get_participant_by_user_id(legacy_feed_id)
+                            legacy_display = legacy_publisher.display if legacy_publisher else ''
+                            legacy = True
+                            # JANUS_LOG(LOG_WARN, "Deprecated subscriber 'join' API: please start looking into the new one for the future\n");
+                            log.warning( "Deprecated subscriber 'join' API: please start looking into the new one for the future")
+
+                        new_subscriber, reply_jsep = \
+                            room.new_subscriber(handle=self, pvt_id=pvt_id, **join_params)
                         try:
-                            reply_jsep = new_subscriber.subscribe(publisher, **join_params)
+                            # reply_jsep = new_subscriber.join(room=room, **join_params)
 
                             # attach subscriber to self
                             self.participant_type = JANUS_VIDEOROOM_P_TYPE_SUBSCRIBER
@@ -2800,15 +3674,19 @@ class VideoRoomHandle(FrontendHandleBase):
                             reply_event = {
                                 'videoroom': 'attached',
                                 'room': room.room_id,
-                                'id': publisher.user_id
+                                'streams': new_subscriber.streams_info()
                             }
-                            if publisher.display:
-                                reply_event['display'] = publisher.display
 
                             if legacy:
+                                reply_event['id'] = legacy_feed_id
+                                if legacy_display:
+                                    reply_event['display'] = legacy_display
                                 reply_event['warning'] = \
-                                    'Deprecated use of \'listener\' ptype, update to the new \'subscriber\' ASAP'
+                                    'deprecated_api'
+
                         except Exception:
+                            self.participant_type = JANUS_VIDEOROOM_P_TYPE_NONE
+                            self.participant = None
                             if new_subscriber:
                                 new_subscriber.destroy()
                             raise
@@ -2831,6 +3709,10 @@ class VideoRoomHandle(FrontendHandleBase):
                     if publisher.sdp == '' and jsep:
                         publisher.room.check_max_publishers()
 
+                    sdp_update = False
+                    if publisher.sdp and jsep and jsep.get('sdp'):
+                        sdp_update = True
+
                     reply_jsep = publisher.configure(**configure_params)
 
                     reply_event = {
@@ -2838,10 +3720,23 @@ class VideoRoomHandle(FrontendHandleBase):
                         'room': publisher.room_id,
                         'configured': 'ok',
                     }
+                    # For backwards compatibility, update the event with info on the codecs that we'll be handling
+				    # TODO This will make no sense in the future, as different streams may use different codecs 
                     if reply_jsep and publisher.vcodec:
                         reply_event['video_codec'] = publisher.vcodec
                     if reply_jsep and publisher.acodec:
                         reply_event['audio_codec'] = publisher.acodec
+                    if reply_jsep:
+                        reply_event['streams'] = publisher.streams_info()
+                    
+                    if sdp_update and publisher.webrtc_started:
+                        self._push_plugin_event(data=reply_event, 
+                                                    jsep=reply_jsep, 
+                                                    transaction=transaction)
+                        reply_event = None
+                        reply_jsep = None
+                        if publisher.room is not None:
+                            publisher.room.notify_about_publisher(publisher)
 
                 elif request == 'publish':
                     publish_params = publisher_publish_schema.validate(body)
@@ -2855,10 +3750,14 @@ class VideoRoomHandle(FrontendHandleBase):
                         'room': publisher.room_id,
                         'configured': 'ok',
                     }
+
+                    # For backwards compatibility
                     if reply_jsep and publisher.vcodec:
                         reply_event['video_codec'] = publisher.vcodec
                     if reply_jsep and publisher.acodec:
                         reply_event['audio_codec'] = publisher.acodec
+                    if reply_jsep:
+                        reply_event['streams'] = publisher.streams_info()
 
                 elif request == 'unpublish':
                     publisher.unpublish()
@@ -2884,8 +3783,6 @@ class VideoRoomHandle(FrontendHandleBase):
 
             elif self.participant_type == JANUS_VIDEOROOM_P_TYPE_SUBSCRIBER:
                 subscriber = self.participant
-                if not self._room_mgr.exists(subscriber.room_id):
-                    raise JanusCloudError('No such room', JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)
                 if request == 'configure':
                     configure_params = subscriber_configure_schema.validate(body)
                     reply_jsep = subscriber.configure(**configure_params)
@@ -2922,12 +3819,51 @@ class VideoRoomHandle(FrontendHandleBase):
                         'room': room_id,
                         'left': 'ok',
                     }
+
+                elif request == 'subscribe':
+                    log.debug('Adding new subscriber streams')
+
+                    subscribe_params = subscriber_subscribe_schema.validate(body)
+                    update_result, reply_jsep = subscriber.subscribe(**subscribe_params)
+                    reply_event = {
+                        'videoroom': update_result,
+                        'room': subscriber.room_id,
+                    }
+                    if reply_jsep:
+                        reply_event['streams'] = subscriber.streams_info()
+                elif request == 'unsubscribe':
+                    log.debug('Removing subscriber streams')
+
+                    unsubscribe_params = subscriber_unsubscribe_schema.validate(body)
+                    update_result, reply_jsep = subscriber.unsubscribe(**unsubscribe_params)
+
+                    reply_event = {
+                        'videoroom': update_result,
+                        'room': subscriber.room_id,
+                    }
+                    if reply_jsep:
+                        reply_event['streams'] = subscriber.streams_info()
+                elif request == 'update':
+                    log.debug('Adding new subscriber streams')
+                    log.debug('Removing subscriber streams')
+
+                    update_params = subscriber_update_schema.validate(body)
+                    update_result, reply_jsep = subscriber.update(**update_params)
+
+                    reply_event = {
+                        'videoroom': update_result,
+                        'room': subscriber.room_id,
+                    }
+                    if reply_jsep:
+                        reply_event['streams'] = subscriber.streams_info()
+
                 else:
                     raise JanusCloudError('Unknown request \'{}\''.format(request),
                                           JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)
 
             # Process successfully
-            self._push_plugin_event(data=reply_event, jsep=reply_jsep, transaction=transaction)
+            if reply_event:
+                self._push_plugin_event(data=reply_event, jsep=reply_jsep, transaction=transaction)
 
         except JanusCloudError as e:
             log.exception('Fail to handle async message ({}) for handle {}'.format(body, self.handle_id))
@@ -3294,11 +4230,15 @@ def get_videoroom_participant_list(request):
         if publisher.display:
             part_info['display'] = publisher.display
 
-        if publisher.webrtc_started and publisher.audiolevel_ext:
-            part_info['talking'] = publisher.talking
-
         if publisher.webrtc_started:
-            part_info['subscribers'] = publisher.subscriber_num()
+            found = False
+            talking = False
+            for ps in publisher.streams:
+                if ps.type == 'audio' and ps.audiolevel_ext:
+                    found = True
+                    talking = True if ps.talking else talking
+            if found: 
+                part_info['talking'] = talking
 
         backend_room = publisher.get_backend_room()
         if backend_room:
@@ -3324,7 +4264,6 @@ def delete_videoroom_participant(request):
 
     return Response(status=200)
 
-
 @get_view(route_name='videoroom_forwarder_list')
 def get_videoroom_forwarder_list(request):
     plugin = request.registry.videoroom_plugin
@@ -3344,7 +4283,7 @@ def get_videoroom_forwarder_list(request):
 
         publisher_rtp_forwarder_info = {
             'publisher_id': publisher.user_id,
-            'rtp_forwarders': rtp_forwarder_list,
+            'forwarders': rtp_forwarder_list,
         }
 
         if publisher.display:
@@ -3379,9 +4318,9 @@ def post_videoroom_forwarder_list(request):
                               JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)
 
     forward_params = rtp_forward_schema.validate(params)
-    rtp_stream = publisher.rtp_forward(**forward_params)
+    forwarders = publisher.rtp_forward(**forward_params)
 
-    return rtp_stream
+    return forwarders
 
 
 @delete_view(route_name='videoroom_forwarder_list')
@@ -3412,4 +4351,3 @@ def delete_videoroom_forwarder_list(request):
     publisher.stop_rtp_forward(stream_info['stream_id'])
 
     return Response(status=200)
-

@@ -92,20 +92,20 @@ class P2PCallHandle(FrontendHandleBase):
             self.p2pcall_user = None
 
     def handle_hangup(self):
-        log.debug('handle_hangup for p2pcall Handle {}'.format(self.handle_id))
+        # log.debug('handle_hangup for p2pcall Handle {}'.format(self.handle_id))
         if self.p2pcall_user and self.p2pcall_user.incall:
             hangup_msg = create_janus_msg('hangup', reason='Peer Hangup')
             self._send_aync_event(self.p2pcall_user.peer_name, hangup_msg)
 
     def handle_message(self, transaction, body, jsep=None):
-        log.debug('handle_message for p2pcall handle {}. transaction:{} body:{} jsep:{}'.
-                 format(self.handle_id, transaction, body, jsep))
+        # log.debug('handle_message for p2pcall handle {}. transaction:{} body:{} jsep:{}'.
+        #          format(self.handle_id, transaction, body, jsep))
         self._enqueue_async_message(transaction, body, jsep)
         return JANUS_PLUGIN_OK_WAIT, None
 
     def handle_trickle(self, candidate=None, candidates=None):
-        log.debug('handle_trickle for p2pcall handle {}.candidate:{} candidates:{}'.
-                 format(self.handle_id, candidate, candidates))
+        # log.debug('handle_trickle for p2pcall handle {}.candidate:{} candidates:{}'.
+        #          format(self.handle_id, candidate, candidates))
 
         if candidate:
             if candidates:

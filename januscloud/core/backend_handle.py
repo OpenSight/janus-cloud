@@ -172,15 +172,17 @@ class BackendHandle(object):
                 log.exception('on_close() exception for backend handle {}'.format(self.handle_id))
 
     def _async_event_handler_routine(self):
-        while not self._has_detach:
+        while True:
+            if self._has_detach and self._async_event_queue.empty():
+                break
             event_msg = self._async_event_queue.get()
-            if self._has_detach or event_msg == stop_message:
-                return
+            if event_msg == stop_message:
+                break
             try:
                 if self._handle_listener:
                     self._handle_listener.on_async_event(self, event_msg)
             except Exception:
-                log.exception('Error when handle async event for backend handle {}'.format(self.handle_id))
+                log.exception('Error when handle async event for backend handle {}'.format(self.handle_id))  
 
 if __name__ == '__main__':
 

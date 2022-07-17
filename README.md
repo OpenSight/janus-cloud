@@ -19,7 +19,7 @@ Second, Janus processes the WebRTC signalling, as well as the media data. But in
 - Scalable, Janus media servers can be added/removed to/from the cluster dynamically
 - Support Janus media service self-register, service monitor, circuit breaker
 - Pluggable, support the new features through developing the new plugin
-- Consistent API with the Janus server (until v0.12.0), which is compatible with the original client of the Janus server
+- Consistent API with the Janus server (since 1.0.2, until 1.0.2 (2022-05-23)), which is compatible with the original client of the Janus server
 
 
 3 Components
@@ -65,23 +65,25 @@ This is a simple video call plugin which allow two WebRTC peer communicate with 
 
 Moreover, Janus-proxy also can be scaled out for videocall plugin to handle much more video calls. Different WebRTC peers may be assigned to different Janus-proxies which is able to communicates with each other through admin interface.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v0.12.0(2022-03-03).
+Its APIs is compatible with the videocall plugin of Janus-gateway util v1.0.3(2022-06-20).
 
 ### p2pcall
 
 This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janus-proxy be able to scaled out to handle more video call. However no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v0.12.0(2022-03-03).
+Its APIs is compatible with the videocall plugin of Janus-gateway util v1.0.3(2022-6-20).
 
 ### videoroom
 
 This is a plugin implementing a videoconferencing SFU, just like videoroom plugin of the Janus server. It tries to keep almost the same API with the videoroom plugin of Janus server, and scale it out by distributing different publishers to different backend Janus server, so that Janus-proxy can support more publishers in one videoconferencing room than single Janus server. Contrast to the videoroom plugin of Janus server, there are some limitations below on this plugin to simplify the code.
 
-- audiolevel_event not support
 - subscriber switch not support
 - string_ids not support
+- dummy publishers not support
 
-Its APIs is compatible with the videoroom plugin of Janus-gateway util v0.12.0(2022-03-03).
+The videoroom plugin of Janus-gateway has refactored with the new multistream API primitive since v1.0.0, so this plugin also need to refactored to support it.
+The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.0.3(2022-06-20). 
+If you want to deploy the Janus-proxy with the old Janus-gateway which version is lower than v1.0.0 and make use of the old API (without multistream), please use the 0.x version (from 0.x branch) of Janus-cloud 
 
 5 Topology
 -----------------
@@ -211,6 +213,8 @@ janus-cloud/
     +----LICENSE          AGPL 3.0 license 
     |
     +----MANIFEST.in      Manifest file describing the static resource file
+    |
+    +----pyproject.toml   python project building description file (compatible with PEP 518 / PEP 517)
     |
     +----setup.py         Python setup script
 ```
