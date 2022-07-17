@@ -53,7 +53,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v0.12.0(2022-03-03)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v1.0.3(2022-06-20)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -1219,7 +1219,9 @@ class PublisherStream(object):
     def __init__(self, mindex: int, type: str, mid: str, 
                  disabled=False, codec='', 
                  description='', moderated=False, 
-                 opus_fec=False, audiolevel_ext=False, talking=False,
+                 fec=False, dtx=False, stereo=False,
+                 audiolevel_ext=False, talking=False,
+                 h264_profile='', vp9_profile='',
                  simulcast=False, svc=False):
         self.mindex = mindex
         self.type = type
@@ -1228,9 +1230,13 @@ class PublisherStream(object):
         self.codec = codec
         self.description = description
         self.moderated = moderated
-        self.opus_fec = opus_fec
+        self.fec = fec
+        self.dtx = dtx
+        self.stereo = stereo
         self.audiolevel_ext = audiolevel_ext
         self.talking = talking
+        self.h264_profile = h264_profile
+        self.vp9_profile = vp9_profile
         self.simulcast = simulcast
         self.svc = svc
 
@@ -1389,6 +1395,7 @@ class VideoRoomPublisher(object):
 
     def _update_streams(self, streams_info):
         
+        org_streams_bymid = self.streams_bymid.copy()
         self.streams.clear()
         self.streams_bymid.clear()
         self.data_stream = None
@@ -1396,15 +1403,22 @@ class VideoRoomPublisher(object):
         for index, stream_info in enumerate(streams_info):
             stream_info = dict(stream_info)
             mindex = stream_info.pop('mindex', index)
-            # handle change '-' to '_'
-            if 'opus-fec' in stream_info:
-                stream_info['opus-fec'] = stream_info.pop('opus-fec')
 
             stream = PublisherStream(mindex=mindex, **stream_info)
+            # Some of the stream's properties can not be acquired from the new streams_info,
+            # so they are acruired from the old one
+            org_stream = org_streams_bymid.get(stream.mid)
+            if org_stream:
+                stream.audiolevel_ext = org_stream.audiolevel_ext
+                stream.talking = org_stream.talking
+                stream.moderated = org_stream.moderated
+
             self.streams.append(stream)
             self.streams_bymid[stream.mid] = stream
             if stream.type == 'data':
                 self.data_stream = stream
+
+        del org_streams_bymid
 
     def streams_info(self):
         media = []
@@ -1424,12 +1438,20 @@ class VideoRoomPublisher(object):
 
                 if stream.type == 'audio':
                     info['codec'] = stream.codec
-                    if stream.opus_fec:
-                        info['"opus-fec"'] = stream.opus_fec
+                    if stream.fec:
+                        info['fec'] = True
+                    if stream.dtx:
+                        info['dtx'] = True
+                    if stream.stereo:
+                        info['stereo'] = True
                     if stream.audiolevel_ext:
                         info['talking'] = stream.talking
                 elif stream.type == 'video':
                     info['codec'] = stream.codec
+                    if stream.codec == 'h264' and stream.h264_profile:
+                        info['h264_profile'] = stream.h264_profile
+                    if stream.codec == 'vp9' and stream.vp9_profile:
+                        info['vp9_profile'] = stream.vp9_profile
                     if stream.simulcast:
                         info['simulcast'] = True
                     if stream.svc:
@@ -2740,15 +2762,28 @@ class VideoRoom(object):
 
                 if stream.type == 'audio':
                     info['codec'] = stream.codec
+
                     if not audio_added:
                         audio_added = True
                         pl['audio_codec'] = stream.codec
+
+                    if stream.codec == 'opus':
+                        if stream.fec:
+                            info['fec'] = True
+                        if stream.dtx:
+                            info['dtx'] = True
+                        if stream.stereo:
+                            info['stereo'] = True
+                    
                 elif stream.type == 'video':
                     info['codec'] = stream.codec
-                    
                     if not video_added:
                         video_added = True
                         pl['video_codec'] = stream.codec
+                    if stream.codec == 'h264' and stream.h264_profile:
+                        info['h264_profile'] = stream.h264_profile
+                    if stream.codec == 'vp9' and stream.vp9_profile:
+                        info['vp9_profile'] = stream.vp9_profile                    
                     if stream.simulcast:
                         info['simulcast'] = True
                     if stream.svc:
@@ -3525,14 +3560,19 @@ class VideoRoomHandle(FrontendHandleBase):
                                         else:
                                             if ps.description:
                                                 info['description'] = ps.description
-                                            if ps.moderated:
-                                                info['moderated'] = True
 
                                             if ps.type == 'audio':
                                                 info['codec'] = ps.codec
                                                 if not audio_added:
                                                     audio_added = True
                                                     publisher_info['audio_codec'] = ps.codec
+                                                if ps.codec == 'opus':
+                                                    if ps.fec:
+                                                        info['fec'] = True
+                                                    if ps.dtx:
+                                                        info['dtx'] = True
+                                                    if ps.stereo:
+                                                        info['stereo'] = True
                                                 if ps.audiolevel_ext:
                                                     info['talking'] = ps.talking
                                                     talking_found = True
@@ -3541,11 +3581,17 @@ class VideoRoomHandle(FrontendHandleBase):
                                                 info['codec'] = ps.codec
                                                 if not video_added:
                                                     video_added = True
-                                                    publisher_info['video_codec'] = ps.codec
+                                                    publisher_info['video_codec'] = ps.codec                                            
+                                                if ps.codec == 'h264' and ps.h264_profile:
+                                                    info['h264_profile'] = ps.h264_profile
+                                                if ps.codec == 'vp9' and ps.vp9_profile:
+                                                    info['vp9_profile'] = ps.vp9_profile
                                                 if ps.simulcast:
                                                     info['simulcast'] = True
                                                 if ps.svc:
                                                     info['svc'] = True
+                                            if ps.moderated:
+                                                info['moderated'] = True
                                         media.append(info)
 
                                     publisher_info['streams'] = media

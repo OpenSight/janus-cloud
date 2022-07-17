@@ -65,13 +65,13 @@ This is a simple video call plugin which allow two WebRTC peer communicate with 
 
 Moreover, Janus-proxy also can be scaled out for videocall plugin to handle much more video calls. Different WebRTC peers may be assigned to different Janus-proxies which is able to communicates with each other through admin interface.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v1.0.2(2022-05-23).
+Its APIs is compatible with the videocall plugin of Janus-gateway util v1.0.3(2022-06-20).
 
 ### p2pcall
 
 This is an other video call plugin, very similar to the videocall plugin, except that two WebRTC peer communicate with each other in p2p mode. It outputs same APIs like the videocall plugin, and also make Janus-proxy be able to scaled out to handle more video call. However no backend Janus servers is need to handle the media stream, because the WebRTC peers transmit the media data with each other directly.
 
-Its APIs is compatible with the videocall plugin of Janus-gateway util v1.0.2(2022-5-23).
+Its APIs is compatible with the videocall plugin of Janus-gateway util v1.0.3(2022-6-20).
 
 ### videoroom
 
@@ -82,7 +82,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - dummy publishers not support
 
 The videoroom plugin of Janus-gateway has refactored with the new multistream API primitive since v1.0.0, so this plugin also need to refactored to support it.
-The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.0.2(2022-05-23). 
+The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.0.3(2022-06-20). 
 If you want to deploy the Janus-proxy with the old Janus-gateway which version is lower than v1.0.0 and make use of the old API (without multistream), please use the 0.x version (from 0.x branch) of Janus-cloud 
 
 5 Topology
