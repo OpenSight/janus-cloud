@@ -222,6 +222,15 @@ publisher_description_schema = Schema({
     AutoDel(str): object  # for all other key we must delete
 })
 
+publisher_configure_stream_schema = Schema({
+    'mid': StrVal(max_len=32),
+    Optional('send'): BoolVal(),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(), 
+    AutoDel(str): object  # for all other key we must delete
+})
+
 publisher_configure_schema = Schema({
     # Deprecated, use mid+send instead
     Optional('audio'): BoolVal(),
@@ -247,6 +256,7 @@ publisher_configure_schema = Schema({
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
+    Optional('streams'): ListVal(publisher_configure_stream_schema),  
     Optional('descriptions'): ListVal(publisher_description_schema),     
     AutoDel(str): object  # for all other key we must delete
 })
@@ -325,6 +335,23 @@ subscriber_update_schema = Schema({
     AutoDel(str): object  # for all other key we must delete
 })
 
+subscriber_configure_stream_schema = Schema({
+    'mid': StrVal(max_len=32),
+    Optional('send'): BoolVal(),
+    # For VP8 (or H.264) simulcast 
+    Optional('substream'): IntVal(min=0, max=2),
+    Optional('temporal'): IntVal(min=0, max=2),
+    Optional('fallback'): IntVal(min=0),  
+
+    # For VP9 SVC
+    Optional('spatial_layer'): IntVal(min=0, max=2),
+    Optional('temporal_layer'): IntVal(min=0, max=2),
+    # For the playout-delay RTP extension, if negotiated
+    Optional('min_delay'): IntVal(),    
+    Optional('max_delay'): IntVal(),   
+
+})
+
 subscriber_configure_schema = Schema({
 
     Optional('mid'): StrVal(max_len=32),
@@ -346,6 +373,8 @@ subscriber_configure_schema = Schema({
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
+
+    Optional('streams'): ListVal(subscriber_configure_stream_schema),  
 
     AutoDel(str): object  # for all other key we must delete
 })
@@ -962,6 +991,7 @@ class VideoRoomSubscriber(object):
                   substream=-1, temporal=-1, fallback=-1,
                   spatial_layer=-1, temporal_layer=-1,
                   min_delay=-1, max_delay=-1,
+                  streams=[],
                   **kwargs):
         self._assert_valid()
         if self._kicked:
@@ -976,40 +1006,55 @@ class VideoRoomSubscriber(object):
             if self._wait_sdp_answer:
                 raise JanusCloudError('Still waiting for sdp answer',
                                     JANUS_VIDEOROOM_ERROR_INVALID_REQUEST)                
+        # check twhether the given mid exists
+        if streams:
+            for stream in streams:
+                if stream.get('mid', '') not in self.streams_bymid:
+                    raise JanusCloudError('No such mid \'{}\' in subscription'.format(mid),
+                                           JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)     
+        elif mid and mid not in self.streams_bymid:
+            raise JanusCloudError('No such mid \'{}\' in subscription'.format(mid),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)          
 
         # backend configure
         # send request to backend
         body = {
             'request': 'configure',
         }
-        if mid:
-            body['mid'] = mid
-        if send is not None:
-            body['send'] = bool(send)
         if update:
             body['update'] = update,
         if restart:
             body['restart'] = restart
-        if audio is not None:
-            body['audio'] = bool(audio)
-        if video is not None:
-            body['video'] = bool(video)
-        if data is not None:
-            body['data'] = bool(data)
-        if substream >= 0:
-            body['substream'] = substream
-        if temporal >= 0:
-            body['temporal'] = temporal
-        if fallback >= 0:
-            body['fallback'] = fallback
-        if spatial_layer >= 0:
-            body['spatial_layer'] = spatial_layer
-        if temporal_layer >= 0:
-            body['temporal_layer'] = temporal_layer
-        if min_delay >= 0:
-            body['min_delay'] = min_delay
-        if max_delay >= 0:
-            body['max_delay'] = max_delay     
+        if streams:
+            body['streams'] = streams
+            audio = None
+            video = None
+            data = None
+        else:
+            if mid:
+                body['mid'] = mid
+            if send is not None:
+                body['send'] = bool(send)
+            if substream >= 0:
+                body['substream'] = substream
+            if temporal >= 0:
+                body['temporal'] = temporal
+            if fallback >= 0:
+                body['fallback'] = fallback
+            if spatial_layer >= 0:
+                body['spatial_layer'] = spatial_layer
+            if temporal_layer >= 0:
+                body['temporal_layer'] = temporal_layer
+            if min_delay >= 0:
+                body['min_delay'] = min_delay
+            if max_delay >= 0:
+                body['max_delay'] = max_delay
+            if audio is not None:
+                body['audio'] = bool(audio)
+            if video is not None:
+                body['video'] = bool(video)
+            if data is not None:
+                body['data'] = bool(data)
 
         if len(kwargs) > 0:
             for k, v in kwargs.items():
@@ -1427,6 +1472,7 @@ class VideoRoomPublisher(object):
                   min_delay=-1, max_delay=-1,
                   display='', update=False,
                   descriptions=[],
+                  streams=[],
                   jsep=None,
                   **kwargs):
 
@@ -1457,7 +1503,17 @@ class VideoRoomPublisher(object):
         if self.room and self.room.require_e2ee and not e2ee and not self.e2ee:
             log.error('Room requires end-to-end encrypted media')
             raise JanusCloudError('Room requires end-to-end encrypted media',
-                                   JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)            
+                                   JANUS_VIDEOROOM_ERROR_UNAUTHORIZED)       
+
+        # check twhether the given mid exists
+        if streams:
+            for stream in streams:
+                if stream.get('mid', '') not in self.streams_bymid:
+                    raise JanusCloudError('No such mid \'{}\' published'.format(mid),
+                                           JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)     
+        elif mid and mid not in self.streams_bymid:
+            raise JanusCloudError('No such mid \'{}\' published'.format(mid),
+                                  JANUS_VIDEOROOM_ERROR_NO_SUCH_FEED)          
 
         # check record lock
         record_locked = False
@@ -1470,20 +1526,32 @@ class VideoRoomPublisher(object):
         body = {
             'request': 'configure',
         }
-        if keyframe:
-            body['keyframe'] = keyframe
+        if streams:
+            body['streams'] = streams
+            audio = None
+            video = None
+            data = None
+            
+        else:
+            if mid:
+                body['mid'] = mid
+            if send is not None:
+                body['send'] = send            
+            if keyframe:
+                body['keyframe'] = keyframe
+            if min_delay >= 0:
+                body['min_delay'] = min_delay
+            if max_delay >= 0:
+                body['max_delay'] = max_delay
+            if audio is not None:
+                body['audio'] = audio
+            if video is not None:
+                body['video'] = video
+            if data is not None:
+                body['data'] = data
+
         if update:
             body['update'] = update
-        if mid:
-            body['mid'] = mid
-        if send is not None:
-            body['send'] = send
-        if audio is not None:
-            body['audio'] = audio
-        if video is not None:
-            body['video'] = video
-        if data is not None:
-            body['data'] = data
         if audiocodec:
             body['audiocodec'] = audiocodec
         if videocodec:
@@ -1500,7 +1568,6 @@ class VideoRoomPublisher(object):
                 body['record'] = self.room.record
             else:  # already configured, not change
                 pass
-
         if filename and not record_locked:
             body['filename'] = filename
         if display:
@@ -1509,10 +1576,7 @@ class VideoRoomPublisher(object):
             body['audio_active_packets'] = audio_active_packets
         if audio_level_average:
             body['audio_level_average'] = audio_level_average
-        if min_delay >= 0:
-            body['min_delay'] = min_delay
-        if max_delay >= 0:
-            body['max_delay'] = max_delay
+
 
         # other future parameters
         if len(kwargs) > 0:
@@ -1536,24 +1600,39 @@ class VideoRoomPublisher(object):
                     self.room_id, self.user_id))         
         
         # print the media send or not
-        if (audio is not None) or (video is not None) or \
-           (data is not None) or (mid and send is not None):
-            for ps in self.streams:
-                mid_found = mid and (send is not None) and (mid == ps.mid)
-                if ps.type == 'audio' and ((audio is not None ) or mid_found):
-                    active = send if mid_found else audio
-                    log.debug('Setting audio property({}): {} (room {}, user {})'.format(
-                        ps.mid, active, self.room_id, self.user_id))                    
-                elif ps.type == 'video' and ((video is not None ) or mid_found):
-                    active = send if mid_found else video
-                    log.debug('Setting video property({}): {} (room {}, user {})'.format(
-                        ps.mid, active, self.room_id, self.user_id))  
-                elif ps.type == 'data' and ((data is not None ) or mid_found):
-                    active = send if mid_found else data
-                    log.debug('Setting data property({}): {} (room {}, user {})'.format(
-                        ps.mid, active, self.room_id, self.user_id))  
+        if streams:
+            for stream in streams:
+                ps = self.streams_bymid.get(stream['mid'])
+                active = stream.get('send')
+                if ps is not None and active is not None:
+                    if ps.type == 'audio':
+                        log.debug('Setting audio property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))                    
+                    elif ps.type == 'video':
+                        log.debug('Setting video property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))  
+                    elif ps.type == 'data':
+                        log.debug('Setting data property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))      
+        else:
+            if (audio is not None) or (video is not None) or \
+            (data is not None) or (mid and send is not None):
+                for ps in self.streams:
+                    mid_found = mid and (send is not None) and (mid == ps.mid)
+                    if ps.type == 'audio' and ((audio is not None ) or mid_found):
+                        active = send if mid_found else audio
+                        log.debug('Setting audio property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))                    
+                    elif ps.type == 'video' and ((video is not None ) or mid_found):
+                        active = send if mid_found else video
+                        log.debug('Setting video property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))  
+                    elif ps.type == 'data' and ((data is not None ) or mid_found):
+                        active = send if mid_found else data
+                        log.debug('Setting data property({}): {} (room {}, user {})'.format(
+                            ps.mid, active, self.room_id, self.user_id))  
 
-        if audiocodec: 
+        if audiocodec and jsep: 
             self.acodec = audiocodec
             log.debug('Setting audio codec property: {} (room {}, user {})'.format(
                 self.acodec, self.room_id, self.user_id))            
@@ -1561,7 +1640,7 @@ class VideoRoomPublisher(object):
             self.acodec = reply_data['audio_codec']
             log.debug('Setting audio codec property: {} (room {}, user {})'.format(
                 self.acodec, self.room_id, self.user_id))
-        if videocodec:
+        if videocodec and jsep:
             self.vcodec = videocodec
             log.debug('Setting video codec property: {} (room {}, user {})'.format(
                 self.vcodec, self.room_id, self.user_id))
