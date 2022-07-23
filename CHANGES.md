@@ -4,7 +4,7 @@ Changelog
 All notable changes to this project will be documented in this file.
 
 
- [v1.0.0]  - unreleased
+ [v1.0.0]  - 2022-07-23
 ---------------------------------
 
 * refactor videoroom plugin to support the new multistream API of Janus-gateway v1.x
