@@ -384,9 +384,6 @@ JANUS_VIDEOROOM_P_TYPE_SUBSCRIBER = 1
 JANUS_VIDEOROOM_P_TYPE_PUBLISHER = 2
 
 
-_video_handles = set()
-
-
 def _send_backend_message(backend_handle, body, jsep=None):
     if backend_handle is None:
         raise JanusCloudError('Not connected', JANUS_ERROR_INTERNAL_ERROR)
@@ -397,7 +394,66 @@ def _send_backend_message(backend_handle, body, jsep=None):
 
     return data, reply_jsep
 
+class BackendHandleManager(object):
+    def __init__(self) -> None:
+        self._backend_handles =  {}
 
+    def get(self, server_name):
+        return self._backend_handles.get(server_name)
+    
+    def exists(self, server_name):
+        return server_name in self._backend_handles
+
+    def create(self, server_name, server_url):
+        
+        backend_handle = self._backend_handles.get(server_name)
+        if backend_handle:
+            # if exists, just return the old one
+            return backend_handle
+        
+        #if not exists , create new one
+        # 1 get backend session
+        backend_session = get_backend_session(server_url,
+                                              auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
+        # 2. attach backend handle
+        backend_handle = backend_session.attach_handle(
+            JANUS_VIDEOROOM_PACKAGE, 
+            opaque_id=server_name,
+            handle_listener=self)
+
+        # 3. check duplicated 
+        if server_name not in self._backend_handles:
+            self._backend_handles[server_name] = backend_handle
+        else:
+            dup_backend_handle = backend_handle
+            backend_handle = self._backend_handles[server_name]
+            dup_backend_handle.detach()
+            
+        
+        return backend_handle
+    
+    def remove(self, server_name):
+        backend_handle = self._backend_handles.pop(server_name, None)
+        if backend_handle:
+            backend_handle.detach()
+
+
+    # backend handle listener callback
+    def on_async_event(self, handle, event_msg):
+        # no event need to process for the backend room control handle
+        pass
+    
+    def on_close(self, handle):
+        # log.debug('backend handle ({}) is closed'.format(
+        #     handle.opaque_id))   
+        server_name = handle.opaque_id
+        cached_handle = self._backend_handles.get(server_name)
+        if cached_handle == handle:
+            # log.debug('backend handle ({}) is popped from BackendHandleManager'.format(
+            #     handle.opaque_id))  
+            self._backend_handles.pop(server_name, None)
+
+_backend_handle_manager = BackendHandleManager()
 
 class SubscriberStream(object):
     def __init__(self, mindex: int, type: str, mid: str, 
@@ -2062,8 +2118,6 @@ class VideoRoomPublisher(object):
 
 class BackendRoom(object):
 
-    _backend_handles =  {}
-
     def __init__(self, backend_server, backend_room_id, backend_admin_key=''):
         self.backend_room_id = backend_room_id
         self.server_name = backend_server.name
@@ -2071,10 +2125,10 @@ class BackendRoom(object):
         self.backend_admin_key = backend_admin_key
         self._backend_publishers = set()
         self._has_destroyed = False
+        self._has_activated = False
 
         # the edit params cache
         self._edit_cache = {}
-
 
         log.info('Backend room "{}"({}) is created'.format(
             self.backend_room_id, 
@@ -2088,7 +2142,11 @@ class BackendRoom(object):
             return
         self._has_destroyed = True
 
-        backend_handle = BackendRoom._backend_handles.get(self.server_name)
+        self._has_activated = False
+
+        self._backend_publishers.clear()
+
+        backend_handle = _backend_handle_manager.get(self.server_name)
 
         if backend_handle is None: 
             # this backend room is inactive
@@ -2120,61 +2178,25 @@ class BackendRoom(object):
                 self.backend_room_id, self.server_url),
                 JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)
         
-        backend_handle = BackendRoom._backend_handles.get(self.server_name)
+        # fast path, no need to talk to backend server
+        if _backend_handle_manager.exists(self.server_name) and \
+            self._backend_publishers and \
+            not self._edit_cache:
+            # There are stll some publishers in this backend room,
+            # not needed to check
+            return
+        
+        # slow (normal) path
+        backend_handle = _backend_handle_manager.create(self.server_name, self.server_url)
+        if backend_handle is None:
+            raise JanusCloudError('backend room "{}" ({}) failed to activate: backend handle creates failed'.format(
+                self.backend_room_id, self.server_url),
+                JANUS_VIDEOROOM_ERROR_NO_SUCH_ROOM)            
 
-        if backend_handle:
-            # active
-            if self._backend_publishers:
-                # There are stll some publishers in this backend room,
-                # not needed to check
-                return 
-            elif  not self._check_exist(backend_handle): 
-                
-                try:
-                    # re-create it if non-exist
-                    self._create_backend(backend_handle, room)
-
-                    self._backend_publishers.clear() # surely no publishers for new backend room
-
-                    log.info('Backend room "{}"({}) is re-created on the backend'.format(
-                                self.backend_room_id, 
-                                self.server_url))    
-                except Exception as e:
-                    if e.code == JANUS_VIDEOROOM_ERROR_ROOM_EXISTS:
-                        pass # the room already exist, continue
-                    else:
-                        raise
-        else: 
-            # non-active
-
-            # 1. attach the handle if not exist
-            # backend session
-            backend_session = get_backend_session(self.server_url,
-                                                    auto_destroy=BACKEND_SESSION_AUTO_DESTROY_TIME)
-            # 2. attach backend handle
-            backend_handle = backend_session.attach_handle(
-                JANUS_VIDEOROOM_PACKAGE, 
-                opaque_id=self.server_name,
-                handle_listener=BackendRoom)
-            
-
-            try:
-                # 3. create room. 
-                # If non-active, the room likely to be absent, try to create it firstly
-                self._create_backend(backend_handle, room)
-
-                self._backend_publishers.clear() # surely no publishers for new backend room
-
-            except Exception as e:
-                if e.code == JANUS_VIDEOROOM_ERROR_ROOM_EXISTS:
-                    pass # the room already exist, continue
-                else:
-                    if backend_handle:
-                        backend_handle.detach()
-                    raise
-
-            try:
-                # 4. if cached, update the room
+        if self._has_activated:
+            # already activated before
+            if self._check_exist(backend_handle):
+                # if cached, update the room
                 if self._edit_cache:
                     # update
                     body = {
@@ -2184,20 +2206,36 @@ class BackendRoom(object):
                     body.update(self._edit_cache)
                     self._edit_cache.clear()
 
-                    _send_backend_message(backend_handle, body=body)  
-
-            except Exception as e:
-                if backend_handle:
-                    backend_handle.detach()
-                raise
-
-            # make active with protection for multi greenlet
-            if self.server_name not in BackendRoom._backend_handles:
-                BackendRoom._backend_handles[self.server_name] = backend_handle
+                    _send_backend_message(backend_handle, body=body)                  
             else:
-                backend_handle.detach()  
 
-            log.info('Backend room "{}"({}) is (re)activated on the backend'.format(
+                self._backend_publishers.clear() # surely no publishers for new backend room
+
+                # re-create it if non-exist
+                try:
+                    self._create_backend(backend_handle, room)
+
+                except Exception as e:
+                    if e.code == JANUS_VIDEOROOM_ERROR_ROOM_EXISTS:
+                        pass # the room already exist, continue
+                    else:
+                        raise                
+
+                log.info('Backend room "{}"({}) is reactivated on the backend'.format(
+                            self.backend_room_id, 
+                            self.server_url)) 
+        else: 
+            try:
+                self._create_backend(backend_handle, room)
+            except Exception as e:
+                if e.code == JANUS_VIDEOROOM_ERROR_ROOM_EXISTS:
+                    pass # the room already exist, continue
+                else:
+                    raise  
+
+            self._has_activated = True
+
+            log.info('Backend room "{}"({}) is activated on the backend'.format(
                         self.backend_room_id, 
                         self.server_url)) 
  
@@ -2208,7 +2246,7 @@ class BackendRoom(object):
         if new_bitrate is None and new_rec_dir is None:
             return # no need to edit
 
-        backend_handle = BackendRoom._backend_handles.get(self.server_name)
+        backend_handle = _backend_handle_manager.get(self.server_name)
 
         if backend_handle is None: 
             # inactive, cache the new params for next activation
@@ -2249,7 +2287,8 @@ class BackendRoom(object):
                     self.server_url)) 
                 pass
             else:
-                raise   
+                raise  
+
     def add_publisher(self, user_id):
         self._backend_publishers.add(user_id)
 
@@ -2304,21 +2343,6 @@ class BackendRoom(object):
 
         # created successfully, no need to cache params again
         self._edit_cache.clear()
-
-    # backend handle listener callback
-    @classmethod
-    def on_async_event(cls, handle, event_msg):
-        # no event need to process for the backend room control handle
-        pass
-    
-    @classmethod
-    def on_close(cls, handle):
-        server_name = handle.opaque_id
-        cached_handle = cls._backend_handles.get(server_name)
-        if cached_handle == handle:
-            cls._backend_handles.pop(server_name, None)
-
-
 
 class VideoRoom(object):
 
@@ -3093,14 +3117,16 @@ class VideoRoomHandle(FrontendHandleBase):
         self.participant_type = JANUS_VIDEOROOM_P_TYPE_NONE
         self.participant = None
 
-        _video_handles.add(handle_id)
+        if self._plugin:
+            self._plugin.handles.add(handle_id)
 
     def detach(self):
         if self._has_destroy:
             return
         super().detach()
 
-        _video_handles.discard(self.handle_id)
+        if self._plugin:
+            self._plugin.handles.discard(self.handle_id)
 
         if self.participant:
             participant = self.participant
@@ -3918,6 +3944,7 @@ class VideoRoomPlugin(PluginBase):
 
     def __init__(self, proxy_config, backend_server_mgr, pyramid_config):
         super().__init__(proxy_config, backend_server_mgr, pyramid_config)
+        self.handles = set()
         self.config = self.read_config(
             os.path.join(proxy_config['general']['configs_folder'], 'janus-proxy.plugin.videoroom.yml')
         )
@@ -4056,7 +4083,7 @@ def get_videoroom_info(request):
         'name': plugin.get_name(),
         'author': plugin.get_author(),
         'description': plugin.get_description(),
-        'handles': len(_video_handles),
+        'handles': len(plugin.handles),
         'rooms': len(room_mgr)
     }
     return videoroom_info
