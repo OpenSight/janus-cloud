@@ -5,3 +5,4 @@ include doc/*
 include CHANGES.md
 include LICENSE
 include README.md
+include pyproject.toml
