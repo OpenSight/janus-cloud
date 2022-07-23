@@ -63,7 +63,7 @@ videoroom_sweeper:
   
   room_auto_destroy_timeout: 600        # the idle room would be destroyed automatically
                                         # after "room_auto_destroy_timeout" sec. default is 600 sec
-										
+
   des_filter: "januscloud-"             # only the rooms with description started with the given string 
                                         # would auto destroyed. 
 
