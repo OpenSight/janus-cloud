@@ -331,10 +331,11 @@ class ListVal(object):
     """
     schema to Validate list which can convert a string/unicode to the list by a sep char
     """
-    def __init__(self, element_type, sep=",", error=None):
+    def __init__(self, element_type, sep=",",  max_len=None, error=None):
         self._error = error
         self._schema = Schema([element_type])
         self.sep = sep
+        self._max_len = max_len
 
     def validate(self, data):
         if data is None:
@@ -347,6 +348,9 @@ class ListVal(object):
                     data = data.split(self.sep)
             except Exception:
                 raise SchemaError('%s is not valid string or list' % data, self._error)
+        
+        if self._max_len is not None and len(data) > self._max_len:
+            raise SchemaError('{0} should be shorter than {1} elements'.format(data, self._max_len), self._error)
 
         return self._schema.validate(data)
 
