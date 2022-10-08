@@ -2311,6 +2311,7 @@ class BackendRoom(object):
             'permanent': False,
             'is_private': False,
             'require_pvtid': False,
+            'publishers': 10000,       # no publisher number limitation
             'bitrate': room.bitrate,
             'fir_freq': room.fir_freq,
             'audiocodec': ','.join(room.audiocodec),
