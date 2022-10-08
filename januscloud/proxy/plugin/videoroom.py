@@ -2697,8 +2697,10 @@ class VideoRoom(object):
     def get_backend_room_id(self):
         return self._backend_room_id
 
-    def get_backend_admin_key(self):
-        return self._backend_admin_key
+
+    def set_backend_admin_key(self, backend_admin_key):
+        self._backend_admin_key = backend_admin_key
+
 
     def pvt_id_exists(self, pvt_id):
         return pvt_id in self._private_id
@@ -3047,6 +3049,7 @@ class VideoRoomManager(object):
             if room is None:
                 self.create(room_id=room_id,
                             permanent=False,
+                            admin_key=self._admin_key,
                             room_params=room_params)
             else:
                 for k, v in room_params.items():
@@ -3059,6 +3062,7 @@ class VideoRoomManager(object):
             return
         room_list = self._room_dao.get_list()
         for room in room_list:
+            room.set_backend_admin_key(self._admin_key)
             self._rooms_map[room.room_id] = room
             if not room.is_private:
                 self._public_rooms_list.append(room)

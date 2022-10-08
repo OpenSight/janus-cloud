@@ -108,14 +108,14 @@ class BackendServerManager(object):
 
         return normal_servers
 
-    def _rand_algo(self, server_dao, session_transport):
+    def _rand_algo(self, server_dao, session_transport=None):
         server_list = BackendServerManager.get_valid_servers(server_dao)
         if len(server_list) == 0:
             return None
         index = random.randint(0, len(server_list) - 1)
         return server_list[index]
 
-    def _wr_algo(self, server_dao, session_transport):
+    def _wr_algo(self, server_dao, session_transport=None):
         server_list = BackendServerManager.get_valid_servers(server_dao)
         if len(server_list) == 0:
             return None
@@ -132,7 +132,7 @@ class BackendServerManager(object):
         index = bisect.bisect_right(totals, rnd)
         return server_list[index]
 
-    def _rr_algo(self, server_dao, session_transport):
+    def _rr_algo(self, server_dao, session_transport=None):
         server_list = BackendServerManager.get_valid_servers(server_dao)
         if len(server_list) == 0:
             return None
@@ -140,7 +140,7 @@ class BackendServerManager(object):
         self._rr_index += 1
         return server_list[index]
 
-    def _lb_algo(self, server_dao, session_transport):
+    def _lb_algo(self, server_dao, session_transport=None):
         server_list = BackendServerManager.get_valid_servers(server_dao)
         target = None
         for server in server_list:
@@ -152,7 +152,7 @@ class BackendServerManager(object):
 
         return target
 
-    def choose_server(self, transport):
+    def choose_server(self, transport=None):
         return self._select_algorithm(self._server_dao, transport)
 
     def _check_expired_routine(self):
