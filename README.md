@@ -59,6 +59,16 @@ Janus-proxy is composed of many plugins, and the business logic of Janus-proxy i
 
 This is a trivial EchoTest plugin which is only used for test and show plugin interface of Janus-proxy. It provide developers a skeleton for the new plugin development
 
+### audiobridge
+
+This is a plugin implementing an audio conference MCU, which mixs all participant's input stream to one ouput stream. It achieves the same function and outputs the same APIs with the audiobridge plugin of Janus server, as well as it can distribute distributing conference rooms to different backend Janus server, so that Janus-proxy can support more concurrent audio conferences than single Janus server. Contrast to the audiobridge plugin of Janus server, there are some limitations below on this plugin to simplify the code. 
+
+- changeroom switch not support
+- string_ids not support
+
+Its APIs is compatible with the audiobridge plugin of Janus-gateway util v1.0.3(2022-06-20).
+
+
 ### videocall
 
 This is a simple video call plugin which allow two WebRTC peer communicate with each other through the medium Janus server. It achieves the same function and outputs the same APIs with the videocall plugin of Janus server, as well as it can distribute the workload among the backend Janus servers.
