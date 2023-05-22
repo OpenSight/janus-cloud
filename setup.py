@@ -11,7 +11,7 @@ requires = [
     'ws4py==0.5.1',
     'PyYAML==5.4',
     'pyramid==1.10.4',
-    'requests==2.20.0',
+    'requests==2.31.0',
     'python-daemon==2.2.3',
     'redis==3.5.2'
 ]
