@@ -287,6 +287,7 @@ subscriber_stream_schema = Schema({
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
+    Optional('crossrefid'): StrVal(max_len=256),    
     AutoDel(str): object  # for all other key we must delete
 })
 
@@ -465,7 +466,8 @@ class SubscriberStream(object):
                  h264_profile='', vp9_profile='',
                  playout_delay={},
                  simulcast={},
-                 svc={}):
+                 svc={},
+                 crossrefid=''):
         self.mindex = mindex
         self.type = type
         self.mid = mid
@@ -484,6 +486,7 @@ class SubscriberStream(object):
         self.playout_delay = playout_delay
         self.simulcast = simulcast
         self.svc = svc
+        self.crossrefid = crossrefid
 
 class VideoRoomSubscriber(object):
 
@@ -673,6 +676,9 @@ class VideoRoomSubscriber(object):
                 'ready': stream.ready,
                 'send': stream.send
             }
+            if stream.crossrefid:
+                info['crossrefid'] = stream.crossrefid
+                
             if stream.type == 'data':
                 if stream.sources:
                     info['sources'] = stream.sources
