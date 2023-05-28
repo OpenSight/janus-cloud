@@ -301,7 +301,6 @@ subscriber_del_stream_schema = Schema({
 subscriber_join_schema = Schema({
     Optional('feed'): IntVal(min=1),
     Optional('private_id'): IntVal(min=1),
-    Optional('close_pc'): BoolVal(),
     Optional('audio'): BoolVal(),
     Optional('video'): BoolVal(),
     Optional('data'): BoolVal(),
