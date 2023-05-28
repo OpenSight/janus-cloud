@@ -314,9 +314,10 @@ subscriber_join_schema = Schema({
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
     # For the playout-delay RTP extension, if negotiated
-    Optional('min_delay'): IntVal(),    
+    Optional('min_delay'): IntVal(),
     Optional('max_delay'): IntVal(), 
-    Optional('streams'): ListVal(subscriber_stream_schema),     
+    Optional('streams'): ListVal(subscriber_stream_schema),
+    Optional('use_msid'): BoolVal(),
     AutoDel(str): object  # for all other key we must delete
 })
 
