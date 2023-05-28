@@ -317,6 +317,7 @@ subscriber_join_schema = Schema({
     Optional('max_delay'): IntVal(), 
     Optional('streams'): ListVal(subscriber_stream_schema),
     Optional('use_msid'): BoolVal(),
+    Optional('autoupdate'): BoolVal(),    
     AutoDel(str): object  # for all other key we must delete
 })
 
