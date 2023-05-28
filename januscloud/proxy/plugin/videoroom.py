@@ -287,7 +287,8 @@ subscriber_stream_schema = Schema({
     # For the playout-delay RTP extension, if negotiated
     Optional('min_delay'): IntVal(),    
     Optional('max_delay'): IntVal(), 
-    Optional('crossrefid'): StrVal(max_len=256),    
+    Optional('crossrefid'): StrVal(max_len=256),
+    Optional('send'): BoolVal(),
     AutoDel(str): object  # for all other key we must delete
 })
 
