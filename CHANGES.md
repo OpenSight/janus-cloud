@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ---------------------------------
 
 * add a new plugin audiobridge
+* The APIs of Videoroom is compatible with Janus-gateway of v1.1.3
 
 
  [v1.0.0]  - 2022-07-23

@@ -92,7 +92,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - dummy publishers not support
 
 The videoroom plugin of Janus-gateway has refactored with the new multistream API primitive since v1.0.0, so this plugin also need to refactored to support it.
-The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.0.3(2022-06-20). 
+The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.1.3(2023-03-07). 
 If you want to deploy the Janus-proxy with the old Janus-gateway which version is lower than v1.0.0 and make use of the old API (without multistream), please use the 0.x version (from 0.x branch) of Janus-cloud 
 
 5 Topology
