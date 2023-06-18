@@ -97,7 +97,6 @@ room_params_schema = Schema({
     Optional('h264_profile'): StrVal(max_len=256),
     Optional('opus_fec'): BoolVal(),
     Optional('opus_dtx'): BoolVal(),   
-    Optional('video_svc'): BoolVal(),
     Optional('audiolevel_ext'): BoolVal(),
     Optional('audiolevel_event'): BoolVal(),
     Optional('audio_active_packets'): IntVal(min=1),
@@ -2326,7 +2325,6 @@ class BackendRoom(object):
             'videocodec': ','.join(room.videocodec),
             'opus_fec': room.opus_fec,
             'opus_dtx': room.opus_dtx,                
-            'video_svc': room.video_svc,
             'audiolevel_ext': room.audiolevel_ext,
             'audiolevel_event': room.audiolevel_event,
             'audio_active_packets': room.audio_active_packets,
@@ -2360,7 +2358,7 @@ class VideoRoom(object):
                  is_private=False, require_pvtid=False, publishers=3, bitrate=0,
                  bitrate_cap=False, fir_freq=0, audiocodec=['opus'], videocodec=['vp8'], opus_fec=False,
                  opus_dtx=False,
-                 video_svc=False, audiolevel_ext=True, audiolevel_event=False, audio_active_packets=100,
+                 audiolevel_ext=True, audiolevel_event=False, audio_active_packets=100,
                  audio_level_average=25, videoorient_ext=True, playoutdelay_ext=True,
                  transport_wide_cc_ext=False, record=False, rec_dir='', allowed=None,
                  notify_joining=False, lock_record=False, require_e2ee=False,
@@ -2398,14 +2396,6 @@ class VideoRoom(object):
         if self.opus_dtx and 'opus' not in self.audiocodec:
             self.opus_dtx = False
             log.warning('DTX is only supported for rooms that allow Opus: disabling it...')
-
-        self.video_svc = False
-        if video_svc:                         # Whether SVC must be done for video
-            if self.videocodec == ['vp9']:
-                self.video_svc = True
-            else:
-                log.warning('SVC is only supported, in an experimental way, for VP9 only rooms: disabling it...')
-                                                 # (note: only available for VP9 right now)
 
         self.audiolevel_ext = audiolevel_ext     # Whether the ssrc-audio-level extension must
                                                  # be negotiated or not for new publishers
@@ -3309,8 +3299,6 @@ class VideoRoomHandle(FrontendHandleBase):
                     room_info['opus_fec'] = True
                 if room.opus_dtx:
                     room_info['opus_dtx'] = True
-                if room.video_svc:
-                    room_info['video_svc'] = True
                 if room.audiolevel_event:
                     room_info['audio_active_packets'] = room.audio_active_packets
                     room_info['audio_level_average'] = room.audio_level_average
@@ -4043,7 +4031,6 @@ class VideoRoomPlugin(PluginBase):
                 Optional('h264_profile'): StrVal(max_len=256),
                 Optional('opus_fec'): BoolVal(),
                 Optional('opus_dtx'): BoolVal(),
-                Optional('video_svc'): BoolVal(),
                 Optional('audiolevel_ext'): BoolVal(),
                 Optional('audiolevel_event'): BoolVal(),
                 Optional('audio_active_packets'): IntVal(min=1),
@@ -4134,8 +4121,6 @@ def get_videoroom_room_list(request):
             room_info['opus_fec'] = True
         if room.opus_dtx:
             room_info['opus_dtx'] = True            
-        if room.video_svc:
-            room_info['video_svc'] = True
 
         room_info_list.append(room_info)
 
@@ -4193,8 +4178,6 @@ def get_videoroom_room(request):
         room_info['opus_fec'] = True
     if room.opus_dtx:
         room_info['opus_dtx'] = True        
-    if room.video_svc:
-        room_info['video_svc'] = True
 
     return room_info
 

@@ -99,7 +99,6 @@ class RDRoomDao(object):
                          videocodec=rd_room.get('videocodec', 'vp8').split(','),
                          opus_fec=bool(rd_room.get('opus_fec', False)),
                          opus_dtx=bool(rd_room.get('opus_dtx', False)),
-                         video_svc=bool(rd_room.get('video_svc', False)),
                          audiolevel_ext=bool(rd_room.get('audiolevel_ext', False)),
                          audiolevel_event=bool(rd_room.get('audiolevel_event', False)),
                          audio_active_packets=int(rd_room.get('audio_active_packets', 100)),
