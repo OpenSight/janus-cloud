@@ -7,6 +7,7 @@ CHANGES = open(os.path.join(here, 'CHANGES.md')).read()
 
 requires = [
     'gevent==20.9.0',
+    'greenlet==1.1.3',
     'ws4py==0.5.1',
     'PyYAML==5.4',
     'pyramid==1.10.4',
