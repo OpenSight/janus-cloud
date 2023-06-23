@@ -53,7 +53,7 @@ JANUS_VIDEOROOM_ERROR_INVALID_SDP = 437
 JANUS_VIDEOROOM_ERROR_ALREADY_DESTROYED = 470
 JANUS_VIDEOROOM_ERROR_ALREADY_BACKEND = 471
 
-JANUS_VIDEOROOM_API_SYNC_VERSION = 'v1.1.3(2023-03-07)'
+JANUS_VIDEOROOM_API_SYNC_VERSION = 'v1.1.4(2023-06-15)'
 
 JANUS_VIDEOROOM_VERSION = 9
 JANUS_VIDEOROOM_VERSION_STRING = '0.0.9'
@@ -340,12 +340,12 @@ subscriber_update_schema = Schema({
 subscriber_configure_stream_schema = Schema({
     'mid': StrVal(max_len=32),
     Optional('send'): BoolVal(),
-    # For VP8 (or H.264) simulcast 
+    # For simulcast 
     Optional('substream'): IntVal(min=0, max=2),
     Optional('temporal'): IntVal(min=0, max=2),
     Optional('fallback'): IntVal(min=0),  
 
-    # For VP9 SVC
+    # For SVC
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
     # For the playout-delay RTP extension, if negotiated
@@ -365,11 +365,11 @@ subscriber_configure_schema = Schema({
     # used for sdp renegotiation and ICE restart
     Optional('update'): BoolVal(),
     Optional('restart'): BoolVal(),
-    # For VP8 (or H.264) simulcast 
+    # For simulcast 
     Optional('substream'): IntVal(min=0, max=2),
     Optional('temporal'): IntVal(min=0, max=2),
     Optional('fallback'): IntVal(min=0),
-    # For VP9 SVC
+    # For SVC
     Optional('spatial_layer'): IntVal(min=0, max=2),
     Optional('temporal_layer'): IntVal(min=0, max=2),
     # For the playout-delay RTP extension, if negotiated

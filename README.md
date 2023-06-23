@@ -19,7 +19,7 @@ Second, Janus processes the WebRTC signalling, as well as the media data. But in
 - Scalable, Janus media servers can be added/removed to/from the cluster dynamically
 - Support Janus media service self-register, service monitor, circuit breaker
 - Pluggable, support the new features through developing the new plugin
-- Consistent API with the Janus server (since 1.0.2, until 1.0.3 (2022-06-20)), which is compatible with the original client of the Janus server
+- Consistent API with the Janus server (since v1.0.2, until v1.1.4 (2023-06-15)), which is compatible with the original client of the Janus server
 
 
 3 Components
@@ -92,7 +92,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - dummy publishers not support
 
 The videoroom plugin of Janus-gateway has refactored with the new multistream API primitive since v1.0.0, so this plugin also need to refactored to support it.
-The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.1.3(2023-03-07). 
+The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.1.4(2023-06-15). 
 If you want to deploy the Janus-proxy with the old Janus-gateway which version is lower than v1.0.0 and make use of the old API (without multistream), please use the 0.x version (from 0.x branch) of Janus-cloud 
 
 5 Topology
