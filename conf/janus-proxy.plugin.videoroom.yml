@@ -18,6 +18,10 @@ general:
                                                # corresponding videoroom requests to the back-end Janus server
   lock_rtp_forward: false                      # Whether the admin_key above should be enforced for RTP forwarding
                                                # requests too. Default is false.
+  cascade: false                               # Whether enable cascade mode or not. When enable cascade, the media stream
+                                               # would be transport between backend Janus servers, so that multistream 
+                                               # feature (and API) could be used. Default is false.
+
 
 rooms:
 # room_id = unique room ID
@@ -63,6 +67,16 @@ rooms:
 #               for admin to manage listening only participants. default=false)
 # require_e2ee = true|false (whether all participants are required to publish and subscribe
 #             using end-to-end media encryption, e.g., via Insertable Streams; default=false)
+# min_publisher_one_backend = <min publisher number in a backend server before schedule a 
+#                              new backend server to this room>
+#                              Distributing algorithm tuning factor. If not zero, Janus-cloud 
+#                              tend to assign a new publisher to the current backend janus 
+#                              server in the room until the numbers of publisher on each 
+#                              current backend server  reach "min_publisher_one_backend", 
+#                              then Janus-cloud would assign the new  publisher to a new 
+#                              backend server for scaling out the room.If zero, Janus-cloud 
+#                              tend to assign the new publisher to any backend server no 
+#                              whether it is in the room now. Default is 5.
   -
     room_id: 1234
     description: "Demo Room"

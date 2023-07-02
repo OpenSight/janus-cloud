@@ -90,6 +90,7 @@ This is a plugin implementing a videoconferencing SFU, just like videoroom plugi
 - subscriber switch not support
 - string_ids not support
 - dummy publishers not support
+- remote publisher not support
 
 The videoroom plugin of Janus-gateway has refactored with the new multistream API primitive since v1.0.0, so this plugin also need to refactored to support it.
 The new APIs of this plugin supports multistream API primitive,and is compatible with the videoroom plugin of Janus-gateway since 1.0.2 util v1.1.4(2023-06-15). 

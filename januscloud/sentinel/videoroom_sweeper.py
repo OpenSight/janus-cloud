@@ -94,6 +94,33 @@ class VideoroomSweeper(object):
             auto_destroy=self.check_interval*3
             ).attach_handle(JANUS_VIDEOROOM_PACKAGE, handle_listener=self)    
 
+    @staticmethod
+    def _is_idle_room(handle, room_id):
+        try:
+            # get participant info
+            reply_data, reply_jsep = _send_backend_message(handle, {
+                'request': 'listparticipants',
+                'room': room_id
+            })
+        except Exception as e:
+            # if error ocurrs, ignore
+            return False
+
+        valid_par_num = 0
+        par_list = reply_data.get('participants', [])
+        
+        for par in par_list:
+            if par.get('dummy', False):
+                continue
+            if par.get('remote', False):
+                continue
+            valid_par_num = valid_par_num + 1
+        if valid_par_num:
+            return False
+        else:
+            return True
+
+
     def check_idle(self):
         try:
             if self._has_destroy:
@@ -126,8 +153,13 @@ class VideoroomSweeper(object):
                     continue   # pass invalid or in-service room
                 elif not room_info.get('description', '').startswith(self.des_filwter):
                     continue   # pass not januscloud-created room
-                elif room_info.get('num_participants', 1) > 0:
-                    continue   # not idle
+
+                
+                if room_info.get('num_participants', 1) > 0:
+                    # need further check
+                    if not self._is_idle_room(handle, room_id):
+                        # not a idle room, check next
+                        continue
                 
                 # this is a idle room
                 idle_ts = self._idle_rooms.get(room_id, 0)

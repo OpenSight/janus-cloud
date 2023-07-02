@@ -112,7 +112,8 @@ class RDRoomDao(object):
                          lock_record=bool(rd_room.get('lock_record', False)),
                          require_e2ee=bool(rd_room.get('require_e2ee', False)),
                          vp9_profile=str(rd_room.get('vp9_profile', '')),
-                         h264_profile=str(rd_room.get('h264_profile', '')))
+                         h264_profile=str(rd_room.get('h264_profile', '')),
+                         min_publisher_one_backend=int(rd_room.get('min_publisher_one_backend', 5)))
 
         if 'ctime' in rd_room:
             room.ctime = float(rd_room['ctime'])
