@@ -2628,7 +2628,9 @@ class RemotePublisher(object):
         streams_info = self.origin_publisher.streams_info()
         for stream_info in streams_info:
             stream_info.pop('h264_profile', None)
-            stream_info.pop('vp9_profile', None)        
+            stream_info.pop('vp9_profile', None)    
+            stream_info.pop('moderated', None)
+            stream_info.pop('talking', None)
         return streams_info
 
     def set_parent(self, parent):
@@ -4425,7 +4427,7 @@ class VideoRoomHandle(FrontendHandleBase):
                         raise JanusCloudError('Invalid element (ptype)',
                                               JANUS_VIDEOROOM_ERROR_INVALID_ELEMENT)
                 else:
-                    raise JanusCloudError('Invalid request "{}" on unjoined participant'.format(request),
+                    raise JanusCloudError('Invalid request "{}" on unjoined handle'.format(request),
                                           JANUS_VIDEOROOM_ERROR_JOIN_FIRST)
             elif self.participant_type == JANUS_VIDEOROOM_P_TYPE_PUBLISHER:
                 publisher = self.participant
