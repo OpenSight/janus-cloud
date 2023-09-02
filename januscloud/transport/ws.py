@@ -40,6 +40,7 @@ class WSServerConn(WebSocket):
 
         self._recv_msg_cbk = None
         self._closed_cbk = None
+        self._write_lock = RLock()
 
         # pingpong check mechanism
         self._ping_ts = 0
@@ -55,22 +56,13 @@ class WSServerConn(WebSocket):
     def __str__(self):
         return 'websocket server connection with {0}'.format(self.peer_address)
 
-    def opened(self):
-        # patch socket.sendall to protect it with lock,
+    def _write(self, b):
+        # protect _write() with lock
         # in order to prevent sending data from multiple greenlets concurrently
-        lock = RLock()
-        _sendall = self.sock.sendall
+        with self._write_lock:
+            return super()._write(b)
 
-        def sendall(data):
-            lock.acquire()
-            try:
-                _sendall(data)
-            except Exception:
-                raise
-            finally:
-                lock.release()
-        self.sock.sendall = sendall
-
+    def opened(self):
         # start check idle
         if self._pingpong_trigger:
             self._last_active_ts = get_monotonic_time()
@@ -247,31 +239,23 @@ class WSClient(WebSocketClient):
     DEFAULT_MSG_HANDLE_THREAD_POOL_SIZE = 8
 
     def __init__(self, url, recv_msg_cbk=None, close_cbk=None, protocols=None, msg_encoder=None, msg_decoder=None):
-        # patch socket.sendall to protect it with lock,
-        # in order to prevent sending data from multiple greenlets concurrently
         WebSocketClient.__init__(self, url, protocols=protocols)
         self._msg_encoder = msg_encoder or self.DEFAULT_ENCODER
         self._msg_decoder = msg_decoder or self.DEFAULT_DECODER
-        lock = RLock()
-        _sendall = self.sock.sendall
         self._recv_msg_cbk = recv_msg_cbk
         self._close_cbk = close_cbk
-
-        def sendall(data):
-            lock.acquire()
-            try:
-                _sendall(data)
-            except Exception:
-                raise
-            finally:
-                lock.release()
-        self.sock.sendall = sendall
-
+        self._write_lock = RLock()
         self.connect()
         log.info('Created {0}'.format(self))
 
     def __str__(self):
         return 'websocket client connection with {0}'.format(self.peer_address)
+    
+    def _write(self, b):
+        # protect _write() with lock
+        # in order to prevent sending data from multiple greenlets concurrently
+        with self._write_lock:
+            return super()._write(b)
 
     def received_message(self, message):
         if message.is_text:
